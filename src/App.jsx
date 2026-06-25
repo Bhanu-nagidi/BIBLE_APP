@@ -18,6 +18,7 @@ import SettingsScreen from './pages/SettingsScreen'
 import ReadingPlanScreen from './pages/ReadingPlanScreen'
 import NotesScreen from './pages/NotesScreen'
 import Sidebar from './components/Sidebar'
+import BottomNav from './components/BottomNav'
 import Toast from './components/Toast'
 
 // Shown when .env file is missing — app still loads, just nudges the user to configure
@@ -91,6 +92,7 @@ function AppRoutes() {
         </Routes>
       </div>
       {isAuthenticated && <Sidebar />}
+      {isAuthenticated && <BottomNav />}
       {toast && <Toast message={toast} />}
     </>
   )
