@@ -1,0 +1,29 @@
+# Dependencies — never push to GitHub
+node_modules/
+
+# Environment variables — contains secret keys!
+.env
+.env.local
+.env.production
+
+# Build output
+dist/
+build/
+
+# Vite cache
+.vite/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor folders
+.vscode/
+.idea/
+
+# Logs
+*.log
+npm-debug.log*
+
+# SQLite database (local only)
+database.sqlite
