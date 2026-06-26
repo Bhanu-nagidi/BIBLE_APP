@@ -1,12 +1,13 @@
 import React from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Home, BookOpen, Calendar, Bookmark, Settings } from 'lucide-react'
+import { Home, BookOpen, Calendar, Bookmark, Edit, Settings } from 'lucide-react'
 
 const NAV_ITEMS = [
   { path: '/', icon: Home, label: 'Home' },
   { path: '/bible', icon: BookOpen, label: 'Bible' },
   { path: '/plans', icon: Calendar, label: 'Plans' },
   { path: '/bookmarks', icon: Bookmark, label: 'Saved' },
+  { path: '/notes', icon: Edit, label: 'Notes' },
   { path: '/settings', icon: Settings, label: 'Settings' }
 ]
 

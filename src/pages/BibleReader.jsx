@@ -1,12 +1,14 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useBible, BIBLE_BOOKS, BIBLE_LANGUAGES } from '../contexts/BibleContext'
 import { useBibleAPI } from '../hooks/useBibleAPI'
 import AudioPlayer from '../components/AudioPlayer'
+import { ChevronLeft } from 'lucide-react'
+
 
 export default function BibleReader() {
   const navigate = useNavigate()
-  const { selectedLanguage, changeLanguage, currentBook, setCurrentBook, currentChapter, setCurrentChapter, addBookmark, isBookmarked, fontSize, showToast, selectedVerse, setSelectedVerse } = useBible()
+  const { selectedLanguage, changeLanguage, currentBook, setCurrentBook, currentChapter, setCurrentChapter, addBookmark, isBookmarked, fontSize, showToast, selectedVerse, setSelectedVerse, recordChapterRead } = useBible()
   const { getChapter } = useBibleAPI(selectedLanguage.code)
 
   const [verses, setVerses] = useState([])
@@ -14,6 +16,7 @@ export default function BibleReader() {
   const [copyright, setCopyright] = useState('')
   const [showAudio, setShowAudio] = useState(false)
   
+
   // Navigator step variables
   const [showNavigator, setShowNavigator] = useState(false)
   const [navigatorStep, setNavigatorStep] = useState('book') // book | chapter | verse
@@ -32,13 +35,25 @@ export default function BibleReader() {
 
   const loadChapter = async () => {
     setLoading(true)
+    const startTime = Date.now()
     try {
       const result = await getChapter(currentBook.id, currentChapter)
+      
+      let resultParallel = null
+      if (parallelLanguage) {
+        resultParallel = await getChapter(currentBook.id, currentChapter, parallelLanguage.code)
+      }
+
+      // Enforce a minimum display time of 2.5 seconds (2500ms) for a smooth lazy loading transition on mobile
+      const elapsed = Date.now() - startTime
+      const delay = Math.max(0, 2500 - elapsed)
+      if (delay > 0) {
+        await new Promise(resolve => setTimeout(resolve, delay))
+      }
+
       setVerses(result.verses || [])
       setCopyright(result.copyright || '')
-
-      if (parallelLanguage) {
-        const resultParallel = await getChapter(currentBook.id, currentChapter, parallelLanguage.code)
+      if (parallelLanguage && resultParallel) {
         setParallelVerses(resultParallel.verses || [])
       } else {
         setParallelVerses([])
@@ -56,10 +71,9 @@ export default function BibleReader() {
     loadChapter()
   }, [currentBook, currentChapter, selectedLanguage, parallelLanguage])
 
-  // Smooth scroll to selected verse (respects auto-scroll setting)
+  // Smooth scroll to selected verse and flash highlight
   useEffect(() => {
-    const autoScrollEnabled = localStorage.getItem('auto_scroll') === 'true'
-    if (selectedVerse && !loading && autoScrollEnabled) {
+    if (selectedVerse && !loading) {
       setTimeout(() => {
         const el = document.getElementById(`verse-${selectedVerse}`)
         if (el) {
@@ -69,12 +83,6 @@ export default function BibleReader() {
           el.style.background = 'rgba(var(--accent-rgb), 0.18)'
           setTimeout(() => { el.style.background = '' }, 1500)
         }
-      }, 200)
-    } else if (selectedVerse && !loading && !autoScrollEnabled) {
-      // Still scroll when auto-scroll off but user navigated FROM a bookmark
-      setTimeout(() => {
-        const el = document.getElementById(`verse-${selectedVerse}`)
-        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
       }, 200)
     }
   }, [verses, selectedVerse, loading])
@@ -86,8 +94,10 @@ export default function BibleReader() {
     }
   }, [setSelectedVerse])
 
+
   const nextChapter = () => {
     setSelectedVerse(null)
+    recordChapterRead()
     if (currentChapter < currentBook.chapters) {
       setCurrentChapter(currentChapter + 1)
     } else {
@@ -101,6 +111,7 @@ export default function BibleReader() {
 
   const prevChapter = () => {
     setSelectedVerse(null)
+    recordChapterRead()
     if (currentChapter > 1) {
       setCurrentChapter(currentChapter - 1)
     } else {
@@ -158,7 +169,9 @@ export default function BibleReader() {
       {/* Header */}
       <div className="app-header" style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingBottom: '12px', height: 'auto' }}>
         <div style={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center' }}>
-          <button onClick={() => navigate('/')} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '1.2rem' }}>←</button>
+          <button onClick={() => navigate('/')} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4px' }}>
+            <ChevronLeft size={20} />
+          </button>
           
           <div style={{ display: 'flex', gap: '8px' }}>
             <button
@@ -300,6 +313,8 @@ export default function BibleReader() {
         <button className="btn-gold" style={{ flex: 1, padding: '10px' }} onClick={nextChapter}>Next →</button>
       </div>
 
+
+
       {/* Navigator Modal */}
       {showNavigator && (
         <div className="modal-overlay" onClick={() => setShowNavigator(false)}>
@@ -329,7 +344,8 @@ export default function BibleReader() {
                       fontSize: '0.8rem',
                       cursor: isEnabled ? 'pointer' : 'not-allowed',
                       textTransform: 'uppercase',
-                      letterSpacing: '0.04em'
+                      letterSpacing: '0.04em',
+                      border: 'none'
                     }}
                   >
                     {step}

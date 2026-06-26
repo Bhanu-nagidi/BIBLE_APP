@@ -5,7 +5,7 @@ import { useAuth } from '../contexts/AuthContext'
 
 export default function HomeScreen() {
   const navigate = useNavigate()
-  const { selectedLanguage, changeLanguage, streak, verseOfTheDay, addBookmark, isBookmarked, activePlan, toggleReadingComplete, setCurrentBook, setCurrentChapter } = useBible()
+  const { selectedLanguage, changeLanguage, streak, verseOfTheDay, addBookmark, isBookmarked, activePlan, toggleReadingComplete, setCurrentBook, setCurrentChapter, setSelectedVerse } = useBible()
   const { user, isGuest, logout } = useAuth()
   const [showLangPicker, setShowLangPicker] = useState(false)
   const [showProfileDropdown, setShowProfileDropdown] = useState(false)
@@ -22,6 +22,43 @@ export default function HomeScreen() {
     if (book) {
       setCurrentBook(book)
       setCurrentChapter(chapterNum)
+      navigate('/bible')
+    }
+  }
+
+  const handleReadVotd = (verseRef) => {
+    if (!verseRef) return
+
+    // Try to parse reference e.g., "John 3:16" or "1 John 3"
+    const clean = verseRef.trim().replace(/\s+/g, ' ')
+    const match = clean.match(/^(.+?)\s+(\d+)(?:\s*:\s*(\d+))?$/)
+    
+    let resolvedBook = null
+    let chapterNum = 1
+    let verseNum = null
+
+    if (match) {
+      const bookPart = match[1].trim().toLowerCase()
+      chapterNum = parseInt(match[2], 10)
+      verseNum = match[3] ? parseInt(match[3], 10) : null
+      
+      resolvedBook = BIBLE_BOOKS.find(b => 
+        b.name.toLowerCase() === bookPart || 
+        b.id.toLowerCase() === bookPart
+      )
+    } else {
+      // Just book name
+      resolvedBook = BIBLE_BOOKS.find(b => b.name.toLowerCase() === clean.toLowerCase())
+    }
+
+    if (resolvedBook) {
+      setCurrentBook(resolvedBook)
+      setCurrentChapter(chapterNum)
+      if (verseNum) {
+        setSelectedVerse(String(verseNum))
+      } else {
+        setSelectedVerse(null)
+      }
       navigate('/bible')
     }
   }
@@ -538,7 +575,7 @@ export default function HomeScreen() {
                   {isBookmarked(votd.reference) ? '🔖' : '🕮'}
                 </button>
                 <button
-                  onClick={() => navigate('/bible')}
+                  onClick={() => handleReadVotd(votd.reference)}
                   style={{ background: 'rgba(var(--accent-rgb),0.1)', border: '1px solid var(--border)', borderRadius: '8px', padding: '6px 14px', color: 'var(--accent-gold)', fontSize: '0.8rem', cursor: 'pointer' }}
                 >
                   Read →

@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
 import { generateReadingPlan, READING_PLANS_LIST } from '../utils/readingPlanGenerator'
 import { useAuth } from './AuthContext'
+import { VERSE_OF_THE_DAY_365 } from '../utils/dailyVerses'
 
 const BibleContext = createContext(null)
 
@@ -17,15 +18,8 @@ export const BIBLE_LANGUAGES = [
   { code: 'or', name: 'Odia (ଓଡ଼ିଆ)', flag: '🇮🇳', version: 'BSI' },
 ]
 
-export const VERSE_OF_THE_DAY_LIST = [
-  { book: 'John', chapter: 3, verse: 16, reference: 'John 3:16', text: 'For God so loved the world that he gave his one and only Son, that whoever believes in him shall not perish but have eternal life.' },
-  { book: 'Psalm', chapter: 23, verse: 1, reference: 'Psalm 23:1', text: 'The Lord is my shepherd; I shall not want.' },
-  { book: 'Philippians', chapter: 4, verse: 13, reference: 'Philippians 4:13', text: 'I can do all things through Christ who strengthens me.' },
-  { book: 'Jeremiah', chapter: 29, verse: 11, reference: 'Jeremiah 29:11', text: 'For I know the plans I have for you, declares the Lord, plans to prosper you and not to harm you, plans to give you hope and a future.' },
-  { book: 'Romans', chapter: 8, verse: 28, reference: 'Romans 8:28', text: 'And we know that in all things God works for the good of those who love him, who have been called according to his purpose.' },
-  { book: 'Isaiah', chapter: 41, verse: 10, reference: 'Isaiah 41:10', text: 'So do not fear, for I am with you; do not be dismayed, for I am your God.' },
-  { book: 'Matthew', chapter: 6, verse: 33, reference: 'Matthew 6:33', text: 'But seek first his kingdom and his righteousness, and all these things will be given to you as well.' },
-]
+// Kept for backward-compat — new code uses VERSE_OF_THE_DAY_365
+export const VERSE_OF_THE_DAY_LIST = VERSE_OF_THE_DAY_365
 
 export const BIBLE_BOOKS = [
   // Old Testament
@@ -186,7 +180,7 @@ export function BibleProvider({ children }) {
     isGuestRef.current = isGuest
   }, [user, isGuest])
 
-  // Load and update streak based on active user
+  // Load and initialize streak settings on active user change
   useEffect(() => {
     const key = getStreakKey()
     if (!key) return
@@ -200,16 +194,43 @@ export function BibleProvider({ children }) {
     yesterday.setDate(yesterday.getDate() - 1)
     const yesterdayStr = yesterday.toDateString()
 
-    if (currentStreak.lastVisit !== today) {
-      const newCount = currentStreak.lastVisit === yesterdayStr ? currentStreak.count + 1 : 1
-      const history = currentStreak.history || []
-      const newHistory = history.includes(today) ? history : [...history, today].slice(-60)
+    if (isGuest) {
+      // Guest: Visiting immediately completes today's streak
+      if (currentStreak.lastVisit !== today) {
+        const history = currentStreak.history || []
+        const yesterdayWasCompleted = history.includes(yesterdayStr)
+        const newCount = (currentStreak.lastVisit === yesterdayStr || yesterdayWasCompleted) ? currentStreak.count + 1 : 1
+        const newHistory = history.includes(today) ? history : [...history, today].slice(-60)
+        
+        const dailyDetails = currentStreak.dailyDetails || {}
+        if (!dailyDetails[today]) {
+          dailyDetails[today] = { timeSpent: 0, chaptersRead: 0, firstVisit: new Date().toISOString() }
+        }
+        
+        currentStreak = { ...currentStreak, count: newCount, lastVisit: today, history: newHistory, dailyDetails }
+        localStorage.setItem(key, JSON.stringify(currentStreak))
+      }
+    } else {
+      // Registered User: Initialize today but do NOT mark as completed yet
       const dailyDetails = currentStreak.dailyDetails || {}
       if (!dailyDetails[today]) {
         dailyDetails[today] = { timeSpent: 0, chaptersRead: 0, firstVisit: new Date().toISOString() }
+        localStorage.setItem(key, JSON.stringify(currentStreak))
       }
-      currentStreak = { ...currentStreak, count: newCount, lastVisit: today, history: newHistory, dailyDetails }
-      localStorage.setItem(key, JSON.stringify(currentStreak))
+      
+      const history = currentStreak.history || []
+      const todayCompleted = history.includes(today)
+      const yesterdayCompleted = history.includes(yesterdayStr)
+      
+      if (!todayCompleted) {
+        if (yesterdayCompleted) {
+          // Keep count active at yesterday's streak (will increment when today's goal is met)
+          currentStreak.count = currentStreak.count || 1
+        } else {
+          // Streak broken until today's goal is met
+          currentStreak.count = 0
+        }
+      }
     }
 
     setStreak(currentStreak)
@@ -219,45 +240,177 @@ export function BibleProvider({ children }) {
   const [fontSize, setFontSize] = useState(() => parseInt(localStorage.getItem('bible_fontsize') || '18'))
   const [isAudioPlaying, setIsAudioPlaying] = useState(false)
   const [toast, setToast] = useState(null)
-  // Track session start time for time-spent calculation
-  const sessionStartRef = React.useRef(Date.now())
-
   const [selectedVerse, setSelectedVerse] = useState(null)
   const [activePlan, setActivePlan] = useState(() => {
     const saved = localStorage.getItem('bible_active_plan')
     return saved ? JSON.parse(saved) : null
   })
 
-  // Track session time on app open
+  // ── Daily Reminder States & Schedulers ──────────────────────────────────────
+  const [reminderOn, setReminderOn] = useState(false)
+  const [reminderTime, setReminderTime] = useState('08:00')
+  const reminderTimerRef = React.useRef(null)
+
+  const getReminderOnKey = () => user ? `reminder_on_${user.id}` : null
+  const getReminderTimeKey = () => user ? `reminder_time_${user.id}` : null
+
+  const formatTimeAMPM = (timeStr) => {
+    if (!timeStr) return ''
+    const [hStr, mStr] = timeStr.split(':')
+    const h = parseInt(hStr, 10)
+    const ampm = h >= 12 ? 'PM' : 'AM'
+    const displayH = h % 12 === 0 ? 12 : h % 12
+    return `${displayH}:${mStr} ${ampm}`
+  }
+
+  // Load reminder settings
   useEffect(() => {
-    sessionStartRef.current = Date.now()
+    if (isGuest || !user) {
+      setReminderOn(false)
+      return
+    }
+    const onKey = getReminderOnKey()
+    const timeKey = getReminderTimeKey()
+    if (onKey && timeKey) {
+      setReminderOn(localStorage.getItem(onKey) === 'true')
+      setReminderTime(localStorage.getItem(timeKey) || '08:00')
+    }
+  }, [user, isGuest])
 
-    // On page unload, save time spent
-    const handleUnload = () => {
-      const elapsed = Math.round((Date.now() - sessionStartRef.current) / 1000)
-      const key = userRef.current ? `bible_streak_${userRef.current.id}` : isGuestRef.current ? 'bible_streak_guest' : null
-      if (!key) return
+  const scheduleNextReminder = (timeStr) => {
+    if (reminderTimerRef.current) clearTimeout(reminderTimerRef.current)
+    if (!user || isGuest) return
 
-      const current = JSON.parse(localStorage.getItem(key) || '{}')
-      if (current.dailyDetails) {
-        const todayKey = new Date().toDateString()
-        if (!current.dailyDetails[todayKey]) {
-          current.dailyDetails[todayKey] = { timeSpent: 0, chaptersRead: 0 }
-        }
-        current.dailyDetails[todayKey].timeSpent = (current.dailyDetails[todayKey].timeSpent || 0) + elapsed
-        localStorage.setItem(key, JSON.stringify(current))
+    const [h, m] = timeStr.split(':').map(Number)
+    const now = new Date()
+    const next = new Date(now)
+    next.setHours(h, m, 0, 0)
+    if (next <= now) next.setDate(next.getDate() + 1)
+    const ms = next - now
+
+    console.log(`[Reminder] Scheduled daily calendar notification in ${Math.round(ms / 1000)}s at ${timeStr}`);
+
+    reminderTimerRef.current = setTimeout(() => {
+      if (Notification.permission === 'granted' && !isGuest && user) {
+        new Notification('Sacred Word 📖', {
+          body: `Hi ${user.user_metadata?.name || 'Beloved'}, it's time for your daily Bible reading. Keep your streak alive!`,
+          icon: '/logo.jpg'
+        })
+      }
+      scheduleNextReminder(timeStr) // reschedule for next day
+    }, ms)
+  }
+
+  // Monitor changes to reminder settings and reschedule
+  useEffect(() => {
+    if (reminderOn && user && !isGuest) {
+      scheduleNextReminder(reminderTime)
+    } else {
+      if (reminderTimerRef.current) {
+        clearTimeout(reminderTimerRef.current)
+        reminderTimerRef.current = null
       }
     }
-    window.addEventListener('beforeunload', handleUnload)
-    window.addEventListener('visibilitychange', () => {
-      if (document.hidden) handleUnload()
-      else sessionStartRef.current = Date.now()
-    })
     return () => {
-      handleUnload()
-      window.removeEventListener('beforeunload', handleUnload)
+      if (reminderTimerRef.current) clearTimeout(reminderTimerRef.current)
     }
-  }, [])
+  }, [reminderOn, reminderTime, user, isGuest])
+
+  const toggleReminder = async () => {
+    if (isGuest || !user) {
+      showToast('Daily reminders are only available for registered accounts. Please sign in!')
+      return
+    }
+
+    if (!reminderOn) {
+      if (typeof Notification === 'undefined') {
+        showToast('Notifications are not supported on this device')
+        return
+      }
+      let perm = Notification.permission
+      if (perm === 'default') {
+        perm = await Notification.requestPermission()
+      }
+      if (perm !== 'granted') {
+        showToast('Please allow notifications in your browser settings')
+        return
+      }
+
+      const onKey = getReminderOnKey()
+      if (onKey) {
+        localStorage.setItem(onKey, 'true')
+        setReminderOn(true)
+        showToast(`⏰ Reminder set for ${formatTimeAMPM(reminderTime)} daily`)
+      }
+    } else {
+      const onKey = getReminderOnKey()
+      if (onKey) {
+        localStorage.setItem(onKey, 'false')
+        setReminderOn(false)
+        showToast('Reminder turned off')
+      }
+    }
+  }
+
+  const changeReminderTime = (timeStr) => {
+    const timeKey = getReminderTimeKey()
+    if (timeKey) {
+      localStorage.setItem(timeKey, timeStr)
+      setReminderTime(timeStr)
+      showToast(`⏰ Reminder time set to ${formatTimeAMPM(timeStr)}`)
+    }
+  }
+
+  // Global Session Timer: Increments timeSpent and completes registered user streak goals
+  useEffect(() => {
+    const key = getStreakKey()
+    if (!key) return
+
+    const interval = setInterval(() => {
+      const activeKey = getStreakKey()
+      if (!activeKey) return
+
+      const current = JSON.parse(localStorage.getItem(activeKey) || '{}')
+      if (!current.dailyDetails) current.dailyDetails = {}
+      
+      const today = new Date().toDateString()
+      if (!current.dailyDetails[today]) {
+        current.dailyDetails[today] = { timeSpent: 0, chaptersRead: 0, firstVisit: new Date().toISOString() }
+      }
+
+      // Increment session active reading time (1s per tick)
+      current.dailyDetails[today].timeSpent = (current.dailyDetails[today].timeSpent || 0) + 1
+      
+      // Registered user daily goal completion checks
+      const history = current.history || []
+      const alreadyCompleted = history.includes(today)
+      
+      if (!isGuest) {
+        // Registered User Goal: 20 seconds time spent OR 1 chapter read
+        const timeGoalMet = current.dailyDetails[today].timeSpent >= 20
+        const chapterGoalMet = current.dailyDetails[today].chaptersRead >= 1
+        
+        if ((timeGoalMet || chapterGoalMet) && !alreadyCompleted) {
+          current.history = [...history, today].slice(-60)
+          
+          const yesterday = new Date()
+          yesterday.setDate(yesterday.getDate() - 1)
+          const yesterdayStr = yesterday.toDateString()
+          
+          const yesterdayWasCompleted = history.includes(yesterdayStr)
+          current.count = yesterdayWasCompleted ? (current.count || 0) + 1 : 1
+          current.lastVisit = today
+          
+          showToast(`🔥 Streak milestone! Today completed (${current.count} days)`)
+        }
+      }
+
+      localStorage.setItem(activeKey, JSON.stringify(current))
+      setStreak(current)
+    }, 1000)
+
+    return () => clearInterval(interval)
+  }, [user, isGuest])
 
   const changeLanguage = (lang) => {
     setSelectedLanguage(lang)
@@ -292,8 +445,10 @@ export function BibleProvider({ children }) {
   }
 
   const verseOfTheDay = () => {
-    const dayOfYear = Math.floor((new Date() - new Date(new Date().getFullYear(), 0, 0)) / 86400000)
-    return VERSE_OF_THE_DAY_LIST[dayOfYear % VERSE_OF_THE_DAY_LIST.length]
+    const now = new Date()
+    const start = new Date(now.getFullYear(), 0, 0)
+    const dayOfYear = Math.floor((now - start) / 86400000) // 1-365
+    return VERSE_OF_THE_DAY_365[(dayOfYear - 1) % VERSE_OF_THE_DAY_365.length]
   }
 
   const startPlan = (planId, durationDays) => {
@@ -400,6 +555,7 @@ export function BibleProvider({ children }) {
       selectedVerse, setSelectedVerse,
       activePlan, startPlan, toggleReadingComplete, quitPlan,
       recordChapterRead,
+      reminderOn, reminderTime, toggleReminder, changeReminderTime, formatTimeAMPM,
     }}>
       {children}
     </BibleContext.Provider>

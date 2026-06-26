@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react'
 import { useBible, BIBLE_LANGUAGES } from '../contexts/BibleContext'
 import { useAuth } from '../contexts/AuthContext'
+import { useNavigate } from 'react-router-dom'
 
 export default function SettingsScreen() {
-  const { selectedLanguage, changeLanguage, fontSize, changeFontSize, streak, bookmarks, showToast } = useBible()
+  const { selectedLanguage, changeLanguage, fontSize, changeFontSize, streak, bookmarks, showToast,
+          reminderOn, reminderTime, toggleReminder, changeReminderTime, formatTimeAMPM } = useBible()
   const { user, isGuest, logout } = useAuth()
+  const navigate = useNavigate()
 
   const [showLangPicker, setShowLangPicker]       = useState(false)
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
@@ -14,17 +17,21 @@ export default function SettingsScreen() {
   const [ratingDone, setRatingDone]               = useState(false)
 
   // Reading prefs
-  const [showVerseNums, setShowVerseNums] = useState(() => localStorage.getItem('show_verse_nums') !== 'false')
+  const [theme, setTheme]                 = useState(() => localStorage.getItem('app_theme') || 'light')
   const [fontStyle,     setFontStyle]     = useState(() => localStorage.getItem('font_style') || 'sans')
   const [lineSpacing,   setLineSpacing]   = useState(() => localStorage.getItem('line_spacing') || 'normal')
   const [dailyVerse,    setDailyVerse]    = useState(() => localStorage.getItem('daily_verse') !== 'false')
-  const [autoScroll,    setAutoScroll]    = useState(() => localStorage.getItem('auto_scroll') === 'true')
 
-  const toggleVerseNums = () => {
-    const next = !showVerseNums
-    setShowVerseNums(next)
-    localStorage.setItem('show_verse_nums', String(next))
-    showToast(next ? 'Verse numbers shown' : 'Verse numbers hidden')
+  const notifPerm = typeof Notification !== 'undefined' ? Notification.permission : 'default'
+
+  const changeTheme = (newTheme) => {
+    setTheme(newTheme)
+    localStorage.setItem('app_theme', newTheme)
+    if (newTheme === 'light') {
+      document.documentElement.removeAttribute('data-theme')
+    } else {
+      document.documentElement.setAttribute('data-theme', newTheme)
+    }
   }
 
   const changeFontStyle = (s) => {
@@ -47,17 +54,14 @@ export default function SettingsScreen() {
     showToast(next ? 'Daily verse enabled' : 'Daily verse disabled')
   }
 
-  const toggleAutoScroll = () => {
-    const next = !autoScroll
-    setAutoScroll(next)
-    localStorage.setItem('auto_scroll', String(next))
-    showToast(next ? 'Auto-scroll to verse enabled' : 'Auto-scroll disabled')
-  }
-
   const submitRating = (stars) => {
     setRatingValue(stars)
     setRatingDone(true)
     showToast(stars >= 4 ? '🙏 Thank you for your love!' : '🙏 Thanks for your feedback!')
+  }
+
+  const handleReminderTimeChange = (e) => {
+    changeReminderTime(e.target.value)
   }
 
   // ── Sub-components ──────────────────────────────────────────────────────────
@@ -107,21 +111,10 @@ export default function SettingsScreen() {
     </div>
   )
 
-  // Theme options
+  // Only two themes: App Theme (default teal-green) + Glass Blue (modern light glassmorphic)
   const THEMES = [
-    { id: 'light', label: 'Light', bg: '#f3f6f5', card: '#fff',    text: '#2b3533', icon: '☀️' },
-    { id: 'dark',  label: 'Dark',  bg: '#0f1117', card: '#1e2130', text: '#eef0f6', icon: '🌙' },
-    { id: 'sepia', label: 'Sepia', bg: '#f4efe6', card: '#fdf8f0', text: '#3d2e1e', icon: '📜' },
-    { id: 'night', label: 'Night', bg: '#05070d', card: '#0e1220', text: '#c8d0e8', icon: '✨' },
-  ]
-
-  // Accent colors
-  const ACCENTS = [
-    { id: 'teal',   color: '#4ebfa9', label: 'Teal'   },
-    { id: 'gold',   color: '#d4a853', label: 'Gold'   },
-    { id: 'purple', color: '#8b5cf6', label: 'Purple' },
-    { id: 'blue',   color: '#3b82f6', label: 'Blue'   },
-    { id: 'rose',   color: '#f43f5e', label: 'Rose'   },
+    { id: 'light', label: 'App Theme', bg: '#f3f6f5', card: '#fff',    text: '#2b3533', icon: '✝️' },
+    { id: 'white', label: 'Glass Blue', bg: '#eef3f9', card: '#ffffff', text: '#1e293b', icon: '💎' },
   ]
 
   const displayName = isGuest ? 'Guest User' : (user?.user_metadata?.name || user?.email?.split('@')[0] || 'User')
@@ -212,8 +205,39 @@ export default function SettingsScreen() {
         </div>
 
         {/* ── THEME ─────────────────────────────────────────────────────── */}
-
-        {/* ── ACCENT COLOR ──────────────────────────────────────────────── */}
+        <Section title="🎨 Theme">
+          <div style={{ padding: '16px 18px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(78px, 1fr))', gap: '10px' }}>
+            {THEMES.map(t => {
+              const isActive = theme === t.id
+              return (
+                <button
+                  key={t.id}
+                  onClick={() => changeTheme(t.id)}
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    padding: '12px 6px',
+                    borderRadius: 'var(--radius)',
+                    background: t.card,
+                    border: isActive ? '2px solid var(--accent-gold)' : '1px solid var(--border-subtle)',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    boxShadow: isActive ? 'var(--shadow-gold)' : 'none',
+                    minWidth: '74px'
+                  }}
+                >
+                  <span style={{ fontSize: '1.3rem' }}>{t.icon}</span>
+                  <span style={{ fontSize: '0.72rem', fontWeight: isActive ? 700 : 500, color: isActive ? 'var(--accent-gold)' : 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
+                    {t.label}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        </Section>
 
         {/* ── BIBLE READING ─────────────────────────────────────────────── */}
         <Section title="📖 Bible Reading">
@@ -244,9 +268,11 @@ export default function SettingsScreen() {
 
           {/* Font Style */}
           <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border-subtle)',
-            display: 'flex', alignItems: 'center', gap: '14px' }}>
-            <span style={{ fontSize: '1.1rem', width: '22px', textAlign: 'center' }}>🔤</span>
-            <span style={{ flex: 1, fontSize: '0.93rem', color: 'var(--text-primary)' }}>Font Style</span>
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '14px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+              <span style={{ fontSize: '1.1rem', width: '22px', textAlign: 'center' }}>🔤</span>
+              <span style={{ fontSize: '0.93rem', color: 'var(--text-primary)' }}>Font Style</span>
+            </div>
             <div style={{ display: 'flex', gap: '6px' }}>
               {['sans', 'serif'].map(s => (
                 <button key={s} onClick={() => changeFontStyle(s)} style={{
@@ -255,7 +281,7 @@ export default function SettingsScreen() {
                   color: fontStyle === s ? '#fff' : 'var(--text-muted)',
                   fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer',
                   fontFamily: s === 'serif' ? 'Crimson Pro, serif' : 'Inter, sans-serif',
-                  transition: 'all 0.2s'
+                  transition: 'all 0.2s', whiteSpace: 'nowrap'
                 }}>
                   {s === 'sans' ? 'Sans' : 'Serif'}
                 </button>
@@ -264,52 +290,76 @@ export default function SettingsScreen() {
           </div>
 
           {/* Line Spacing */}
-          <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border-subtle)',
-            display: 'flex', alignItems: 'center', gap: '14px' }}>
-            <span style={{ fontSize: '1.1rem', width: '22px', textAlign: 'center' }}>↕️</span>
-            <span style={{ flex: 1, fontSize: '0.93rem', color: 'var(--text-primary)' }}>Line Spacing</span>
-            <div style={{ display: 'flex', gap: '6px' }}>
+          <div style={{ padding: '14px 18px',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '14px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+              <span style={{ fontSize: '1.1rem', width: '22px', textAlign: 'center' }}>↕️</span>
+              <span style={{ fontSize: '0.93rem', color: 'var(--text-primary)' }}>Line Spacing</span>
+            </div>
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
               {[['compact','Compact'],['normal','Normal'],['relaxed','Relaxed']].map(([s, label]) => (
                 <button key={s} onClick={() => changeLineSpacing(s)} style={{
                   padding: '5px 10px', borderRadius: '20px', border: '1px solid var(--border)',
                   background: lineSpacing === s ? 'var(--accent-gold)' : 'transparent',
                   color: lineSpacing === s ? '#fff' : 'var(--text-muted)',
-                  fontSize: '0.72rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s'
+                  fontSize: '0.72rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s',
+                  whiteSpace: 'nowrap'
                 }}>{label}</button>
               ))}
             </div>
           </div>
-
-          {/* Verse Numbers Toggle */}
-          <div style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', gap: '14px' }}>
-            <span style={{ fontSize: '1.1rem', width: '22px', textAlign: 'center' }}>🔢</span>
-            <span style={{ flex: 1, fontSize: '0.93rem', color: 'var(--text-primary)' }}>Show Verse Numbers</span>
-            <Toggle on={showVerseNums} onToggle={toggleVerseNums} />
-          </div>
         </Section>
 
-        {/* ── PREFERENCES ───────────────────────────────────────────────── */}
         <Section title="⚙️ Preferences">
-          {/* Daily Verse */}
-          <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border-subtle)',
+
+          {/* Daily Reminder */}
+          <div style={{ padding: '14px 18px', borderBottom: reminderOn ? '1px solid var(--border-subtle)' : 'none',
             display: 'flex', alignItems: 'center', gap: '14px' }}>
-            <span style={{ fontSize: '1.1rem', width: '22px', textAlign: 'center' }}>🌅</span>
+            <span style={{ fontSize: '1.1rem', width: '22px', textAlign: 'center' }}>⏰</span>
             <div style={{ flex: 1 }}>
-              <p style={{ fontSize: '0.93rem', color: 'var(--text-primary)' }}>Daily Verse</p>
-              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px' }}>Show verse of the day on home</p>
+              <p style={{ fontSize: '0.93rem', color: 'var(--text-primary)' }}>Daily Reminder</p>
+              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                {reminderOn
+                  ? `Reminder set for ${formatTimeAMPM(reminderTime)} every day`
+                  : 'Get a daily notification to read the Bible'}
+              </p>
             </div>
-            <Toggle on={dailyVerse} onToggle={toggleDailyVerse} />
+            <Toggle on={reminderOn} onToggle={toggleReminder} />
           </div>
 
-          {/* Auto Scroll */}
-          <div style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', gap: '14px' }}>
-            <span style={{ fontSize: '1.1rem', width: '22px', textAlign: 'center' }}>📜</span>
-            <div style={{ flex: 1 }}>
-              <p style={{ fontSize: '0.93rem', color: 'var(--text-primary)' }}>Auto-scroll to Verse</p>
-              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px' }}>Jump to bookmarked verse automatically</p>
+          {/* Reminder time picker — only shown when reminder is on */}
+          {reminderOn && (
+            <div style={{ padding: '12px 18px', display: 'flex', alignItems: 'center', gap: '14px', background: 'rgba(var(--accent-rgb),0.04)' }}>
+              <span style={{ fontSize: '1.1rem', width: '22px', textAlign: 'center' }}>🕐</span>
+              <div style={{ flex: 1 }}>
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                  Reminder Time <span style={{ color: 'var(--accent-gold)', fontWeight: 600, marginLeft: '4px' }}>({formatTimeAMPM(reminderTime)})</span>
+                </p>
+                <input
+                  id="reminder-time-input"
+                  type="time"
+                  value={reminderTime}
+                  onChange={handleReminderTimeChange}
+                  style={{
+                    background: 'var(--bg-secondary)',
+                    border: '1px solid var(--border)',
+                    borderRadius: '8px',
+                    color: 'var(--text-primary)',
+                    fontSize: '1rem',
+                    padding: '6px 12px',
+                    fontFamily: 'Inter, sans-serif',
+                    cursor: 'pointer',
+                    outline: 'none'
+                  }}
+                />
+              </div>
+              {notifPerm !== 'granted' && (
+                <p style={{ fontSize: '0.72rem', color: 'var(--error)', maxWidth: '120px', textAlign: 'right' }}>
+                  Allow notifications in browser
+                </p>
+              )}
             </div>
-            <Toggle on={autoScroll} onToggle={toggleAutoScroll} />
-          </div>
+          )}
         </Section>
 
         {/* ── APP INFO ──────────────────────────────────────────────────── */}

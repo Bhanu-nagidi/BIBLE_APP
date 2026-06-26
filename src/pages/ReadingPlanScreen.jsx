@@ -122,43 +122,50 @@ export default function ReadingPlanScreen() {
               Choose a reading plan below to help guide your daily study. You can select your preferred duration to pace yourself.
             </p>
             
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               {READING_PLANS_LIST.map(plan => (
                 <div 
                   key={plan.id}
                   className="card"
                   onClick={() => handleStartPlanClick(plan)}
                   style={{ 
-                    display: 'flex', 
-                    gap: '16px', 
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '10px',
                     border: '1px solid var(--border-subtle)', 
                     background: 'var(--bg-card)',
                     cursor: 'pointer',
                     transition: 'all 0.2s',
-                    position: 'relative'
+                    position: 'relative',
+                    padding: '16px',
+                    overflow: 'hidden'
                   }}
                   onMouseEnter={e => e.currentTarget.style.borderColor = 'rgba(var(--accent-rgb),0.35)'}
                   onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border-subtle)'}
                 >
-                  <div style={{ fontSize: '2.2rem', padding: '6px', background: 'rgba(var(--accent-rgb),0.04)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60px', width: '60px', flexShrink: 0 }}>
-                    {plan.icon}
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                      <h4 style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--text-primary)' }}>{plan.name}</h4>
-                      <span className="badge badge-gold">{plan.badge}</span>
+                  {/* Icon + Name row */}
+                  <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+                    <div style={{ fontSize: '2rem', background: 'rgba(var(--accent-rgb),0.06)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '52px', height: '52px', flexShrink: 0 }}>
+                      {plan.icon}
                     </div>
-                    <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: 1.5, marginBottom: '12px' }}>
-                      {plan.desc}
-                    </p>
-                    <button
-                      type="button"
-                      className="btn-gold"
-                      style={{ padding: '6px 16px', fontSize: '0.8rem', borderRadius: 'var(--radius-sm)', cursor: 'pointer' }}
-                    >
-                      {plan.id === 'topical' ? 'Start 30-Day Plan' : 'Choose Speed & Start'}
-                    </button>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px', marginBottom: '6px' }}>
+                        <h4 style={{ fontWeight: 600, fontSize: '0.92rem', color: 'var(--text-primary)', margin: 0, lineHeight: 1.3 }}>{plan.name}</h4>
+                        <span className="badge badge-gold" style={{ flexShrink: 0, whiteSpace: 'nowrap', fontSize: '0.62rem', padding: '3px 8px' }}>{plan.badge}</span>
+                      </div>
+                      <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.5, margin: 0, wordBreak: 'break-word' }}>
+                        {plan.desc}
+                      </p>
+                    </div>
                   </div>
+                  {/* Full-width CTA button */}
+                  <button
+                    type="button"
+                    className="btn-gold"
+                    style={{ padding: '9px 16px', fontSize: '0.8rem', borderRadius: 'var(--radius-sm)', cursor: 'pointer', width: '100%' }}
+                  >
+                    {plan.id === 'topical' ? 'Start 30-Day Plan' : 'Choose Speed & Start'}
+                  </button>
                 </div>
               ))}
             </div>

@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth, supabaseConfigured } from './contexts/AuthContext'
 
 // Restore saved theme & accent before first render
-const savedTheme  = localStorage.getItem('app_theme')  || 'dark'
+const savedTheme  = localStorage.getItem('app_theme')  || 'light'
 const savedAccent = localStorage.getItem('app_accent') || 'teal'
 if (savedTheme !== 'light') document.documentElement.setAttribute('data-theme', savedTheme)
 document.documentElement.setAttribute('data-accent', savedAccent)

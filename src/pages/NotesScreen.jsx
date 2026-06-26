@@ -147,7 +147,7 @@ export default function NotesScreen() {
 
   return (
     <div className="content-wrapper page-enter">
-      <div className="app-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div className="app-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
         <div>
           <h2 style={{ fontSize: '1.15rem', fontWeight: 600 }}>My Study Notes</h2>
           <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{notes.length} notes saved</span>
@@ -265,8 +265,8 @@ export default function NotesScreen() {
                   gap: '10px' 
                 }}
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '8px' }}>
+                  <div style={{ minWidth: '150px', flex: 1 }}>
                     <h4 style={{ fontSize: '1.05rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {note.title}
                     </h4>
@@ -275,7 +275,7 @@ export default function NotesScreen() {
                     </span>
                   </div>
                   
-                  <div style={{ display: 'flex', gap: '4px', marginLeft: '12px' }}>
+                  <div style={{ display: 'flex', gap: '4px' }}>
                     {note.verseRef && (
                       <button
                         onClick={() => goToVerse(note.verseRef)}
