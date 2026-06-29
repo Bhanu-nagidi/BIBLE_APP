@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import { AuthProvider, useAuth, supabaseConfigured } from './contexts/AuthContext'
+import { notificationService } from './services/notificationService'
 
 // Restore saved theme & accent before first render
 const savedTheme  = localStorage.getItem('app_theme')  || 'light'
@@ -53,6 +54,14 @@ function SetupBanner() {
 function AppRoutes() {
   const { user, isGuest, loading } = useAuth()
   const { toast } = useBible()
+  const navigate = useNavigate()
+
+  // Register Capacitor notification action listener (deep-link on tap)
+  useEffect(() => {
+    notificationService.registerActionListeners((route) => {
+      navigate(route)
+    })
+  }, [])
 
   if (loading) {
     return (

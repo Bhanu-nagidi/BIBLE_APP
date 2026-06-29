@@ -156,7 +156,7 @@ export default function HomeScreen() {
           <div className="search-bar" style={{ borderRadius: '50px', width: '100%', padding: '6px 14px' }}>
             <span style={{ color: 'var(--text-muted)' }}>🔍</span>
             <input
-              placeholder="Search verses, topics, or references..."
+              placeholder="Search the Bible..."
               value={homeSearchQuery}
               onChange={e => setHomeSearchQuery(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') handleSearchSubmit() }}
@@ -345,7 +345,7 @@ export default function HomeScreen() {
           <div className="search-bar" style={{ borderRadius: '50px', padding: '6px 14px' }}>
             <span style={{ color: 'var(--text-muted)' }}>🔍</span>
             <input
-              placeholder="Search verses, topics, or references..."
+              placeholder="Search the Bible..."
               value={homeSearchQuery}
               onChange={e => setHomeSearchQuery(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') handleSearchSubmit() }}
@@ -588,7 +588,7 @@ export default function HomeScreen() {
         {/* Quick Access */}
         <div style={{ marginBottom: '20px' }}>
           <h3 style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '12px' }}>Quick Access</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+          <div className="quick-access-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
             {[
               { icon: '📖', label: 'Read Bible', desc: 'Continue reading', action: () => navigate('/bible') },
               { icon: '🔍', label: 'Search', desc: 'Find verses', action: () => navigate('/search') },

@@ -4,6 +4,7 @@ import { useBible, BIBLE_BOOKS, BIBLE_LANGUAGES } from '../contexts/BibleContext
 import { useBibleAPI } from '../hooks/useBibleAPI'
 import AudioPlayer from '../components/AudioPlayer'
 import { ChevronLeft } from 'lucide-react'
+import { getLocalizedBookName } from '../utils/bibleBookNames'
 
 
 export default function BibleReader() {
@@ -159,10 +160,15 @@ export default function BibleReader() {
     setShowNavigator(false)
   }
 
-  const filteredBooks = BIBLE_BOOKS.filter(b =>
-    b.testament === testament &&
-    b.name.toLowerCase().includes(searchBooks.toLowerCase())
-  )
+  // Filter books by testament and search - search also checks localized name
+  const filteredBooks = BIBLE_BOOKS.filter((b, idx) => {
+    const localizedName = getLocalizedBookName(idx, selectedLanguage.code)
+    const searchLower = searchBooks.toLowerCase()
+    return b.testament === testament && (
+      b.name.toLowerCase().includes(searchLower) ||
+      localizedName.toLowerCase().includes(searchLower)
+    )
+  })
 
   return (
     <div className="content-wrapper page-enter">
@@ -178,7 +184,7 @@ export default function BibleReader() {
               onClick={() => openNavigator('book')}
               style={{ background: 'rgba(var(--accent-rgb), 0.06)', border: '1px solid var(--border-subtle)', borderRadius: '8px', padding: '8px 14px', cursor: 'pointer', color: 'var(--text-primary)', fontSize: '0.9rem', fontWeight: 600 }}
             >
-              {currentBook.name}
+              {getLocalizedBookName(BIBLE_BOOKS.findIndex(b => b.id === currentBook.id), selectedLanguage.code) || currentBook.name}
             </button>
             <button
               onClick={() => openNavigator('chapter')}
@@ -363,22 +369,30 @@ export default function BibleReader() {
                 </div>
                 <input
                   className="input-field"
-                  placeholder="Search books..."
+                  placeholder={selectedLanguage.code === 'en' ? 'Search books...' : `Search books / ${selectedLanguage.name.split(' ')[0]}...`}
                   value={searchBooks}
                   onChange={e => setSearchBooks(e.target.value)}
                   style={{ marginBottom: '12px', width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
                 />
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', overflowY: 'auto', maxHeight: '40vh' }}>
-                  {filteredBooks.map(book => (
-                    <button
-                      key={book.id}
-                      onClick={() => handleNavigatorBookSelect(book)}
-                      style={{ padding: '10px 12px', textAlign: 'left', background: tempBook?.id === book.id ? 'rgba(var(--accent-rgb),0.1)' : 'rgba(var(--accent-rgb),0.03)', border: `1px solid ${tempBook?.id === book.id ? 'rgba(var(--accent-rgb),0.4)' : 'var(--border-subtle)'}`, borderRadius: '8px', cursor: 'pointer', color: tempBook?.id === book.id ? 'var(--accent-gold)' : 'var(--text-primary)', fontSize: '0.85rem', fontWeight: tempBook?.id === book.id ? 600 : 400 }}
-                    >
-                      <div>{book.name}</div>
-                      <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '2px' }}>{book.chapters} ch</div>
-                    </button>
-                  ))}
+                  {filteredBooks.map(book => {
+                    const bookIdx = BIBLE_BOOKS.findIndex(b => b.id === book.id)
+                    const localName = getLocalizedBookName(bookIdx, selectedLanguage.code)
+                    const isNonEnglish = selectedLanguage.code !== 'en'
+                    return (
+                      <button
+                        key={book.id}
+                        onClick={() => handleNavigatorBookSelect(book)}
+                        style={{ padding: '10px 12px', textAlign: 'left', background: tempBook?.id === book.id ? 'rgba(var(--accent-rgb),0.1)' : 'rgba(var(--accent-rgb),0.03)', border: `1px solid ${tempBook?.id === book.id ? 'rgba(var(--accent-rgb),0.4)' : 'var(--border-subtle)'}`, borderRadius: '8px', cursor: 'pointer', color: tempBook?.id === book.id ? 'var(--accent-gold)' : 'var(--text-primary)', fontSize: isNonEnglish ? '0.78rem' : '0.85rem', fontWeight: tempBook?.id === book.id ? 600 : 400 }}
+                      >
+                        <div style={{ lineHeight: 1.3 }}>{localName}</div>
+                        {isNonEnglish && (
+                          <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '1px', opacity: 0.7 }}>{book.name}</div>
+                        )}
+                        <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '2px' }}>{book.chapters} ch</div>
+                      </button>
+                    )
+                  })}
                 </div>
               </>
             )}

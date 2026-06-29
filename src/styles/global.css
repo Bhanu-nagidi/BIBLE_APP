@@ -419,15 +419,16 @@ a { text-decoration: none; color: inherit; }
 .sidebar-logo {
   width: 44px;
   height: 44px;
-  border-radius: 50%;
+  border-radius: 14px;
   object-fit: cover;
-  border: 2px solid var(--border);
+  border: none;
   transition: all 0.25s;
 }
 
 .sidebar.expanded .sidebar-logo {
   width: 50px;
   height: 50px;
+  border-radius: 14px;
 }
 
 .sidebar-logo-text {
@@ -744,7 +745,54 @@ a { text-decoration: none; color: inherit; }
   .bottom-nav {
     display: flex !important;
   }
+  
+  /* Reduce card padding on mobile to maximize viewport space */
+  .card {
+    padding: 12px 14px !important;
+  }
+  
+  /* Mobile Quick Access grid spacing adjustments */
+  .quick-access-grid {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px !important;
+  }
+  
+  /* Compact mobile search bar styling */
+  .search-bar {
+    padding: 8px 12px !important;
+    gap: 8px !important;
+  }
+  
+  .search-bar input {
+    font-size: 0.88rem !important;
+  }
+  
+  .search-bar button {
+    padding: 6px 12px !important;
+    font-size: 0.76rem !important;
+    border-radius: 16px !important;
+  }
 }
+
+/* Extra small mobile screens (e.g. iPhone SE, screen width <= 360px) */
+@media (max-width: 360px) {
+  .quick-access-grid {
+    grid-template-columns: 1fr !important; /* switch to single column to avoid text wrapping */
+    gap: 6px !important;
+  }
+  
+  .search-bar {
+    padding: 6px 10px !important;
+    gap: 6px !important;
+  }
+  
+  .search-bar button {
+    padding: 5px 8px !important;
+    font-size: 0.72rem !important;
+  }
+}
+
 
 /* Optimize bottom nav spacing on smaller mobile viewports for 6 items */
 @media (max-width: 420px) {

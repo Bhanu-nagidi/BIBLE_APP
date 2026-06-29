@@ -2,10 +2,34 @@ import React, { useState, useEffect } from 'react'
 import { useBible, BIBLE_LANGUAGES } from '../contexts/BibleContext'
 import { useAuth } from '../contexts/AuthContext'
 import { useNavigate } from 'react-router-dom'
+import DailyReminder from '../components/DailyReminder'
+
+const parse24to12 = (timeStr) => {
+  const [hStr, mStr] = (timeStr || '08:00').split(':')
+  const h24 = parseInt(hStr, 10)
+  const period = h24 >= 12 ? 'PM' : 'AM'
+  const h12 = h24 % 12 === 0 ? 12 : h24 % 12
+  return {
+    hour: String(h12),
+    minute: mStr,
+    period
+  }
+}
+
+const format12to24 = (h12, min, period) => {
+  let h24 = parseInt(h12, 10)
+  if (period === 'PM' && h24 !== 12) {
+    h24 += 12
+  } else if (period === 'AM' && h24 === 12) {
+    h24 = 0
+  }
+  const hStr = String(h24).padStart(2, '0')
+  return `${hStr}:${min}`
+}
 
 export default function SettingsScreen() {
   const { selectedLanguage, changeLanguage, fontSize, changeFontSize, streak, bookmarks, showToast,
-          reminderOn, reminderTime, toggleReminder, changeReminderTime, formatTimeAMPM } = useBible()
+          reminderOn, reminderTime, permissionStatus, toggleReminder, changeReminderTime, triggerTestNotification, formatTimeAMPM } = useBible()
   const { user, isGuest, logout } = useAuth()
   const navigate = useNavigate()
 
@@ -15,6 +39,21 @@ export default function SettingsScreen() {
   const [ratingValue, setRatingValue]             = useState(0)
   const [hoverRating, setHoverRating]             = useState(0)
   const [ratingDone, setRatingDone]               = useState(false)
+
+  // Local state for stable clock selection
+  const [localHour, setLocalHour] = useState('08')
+  const [localMinute, setLocalMinute] = useState('00')
+  const [localPeriod, setLocalPeriod] = useState('AM')
+
+  // Sync local clock with context when context loads or updates
+  useEffect(() => {
+    if (reminderTime) {
+      const { hour, minute, period } = parse24to12(reminderTime)
+      setLocalHour(hour.padStart(2, '0'))
+      setLocalMinute(minute)
+      setLocalPeriod(period)
+    }
+  }, [reminderTime])
 
   // Reading prefs
   const [theme, setTheme]                 = useState(() => localStorage.getItem('app_theme') || 'light')
@@ -64,52 +103,8 @@ export default function SettingsScreen() {
     changeReminderTime(e.target.value)
   }
 
-  // ── Sub-components ──────────────────────────────────────────────────────────
-  const Section = ({ title, children }) => (
-    <div style={{ marginBottom: '24px' }}>
-      <h4 style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase',
-        letterSpacing: '0.14em', marginBottom: '10px', paddingLeft: '2px' }}>{title}</h4>
-      <div className="card" style={{ border: '1px solid var(--border-subtle)', padding: 0, overflow: 'hidden' }}>
-        {children}
-      </div>
-    </div>
-  )
 
-  const Row = ({ icon, label, value, onClick, danger, last, children }) => (
-    <div style={{ borderBottom: last ? 'none' : '1px solid var(--border-subtle)' }}>
-      <button
-        onClick={onClick}
-        disabled={!onClick && !children}
-        style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '14px',
-          padding: '14px 18px', background: 'none', border: 'none',
-          cursor: onClick ? 'pointer' : 'default', textAlign: 'left', transition: 'background 0.15s' }}
-        onMouseEnter={e => onClick && (e.currentTarget.style.background = 'rgba(255,255,255,0.03)')}
-        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-      >
-        <span style={{ fontSize: '1.1rem', width: '22px', textAlign: 'center' }}>{icon}</span>
-        <span style={{ flex: 1, color: danger ? 'var(--error)' : 'var(--text-primary)', fontSize: '0.93rem' }}>{label}</span>
-        {value && <span style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>{value}</span>}
-        {onClick && <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginLeft: '4px' }}>›</span>}
-      </button>
-      {children}
-    </div>
-  )
 
-  const Toggle = ({ on, onToggle }) => (
-    <div onClick={onToggle} style={{
-      width: '44px', height: '24px', borderRadius: '12px', flexShrink: 0,
-      background: on ? 'var(--accent-gold)' : 'var(--border)',
-      position: 'relative', cursor: 'pointer', transition: 'background 0.25s'
-    }}>
-      <div style={{
-        position: 'absolute', top: '3px',
-        left: on ? '23px' : '3px',
-        width: '18px', height: '18px', borderRadius: '50%',
-        background: '#fff', transition: 'left 0.25s',
-        boxShadow: '0 1px 4px rgba(0,0,0,0.25)'
-      }} />
-    </div>
-  )
 
   // Only two themes: App Theme (default teal-green) + Glass Blue (modern light glassmorphic)
   const THEMES = [
@@ -310,56 +305,17 @@ export default function SettingsScreen() {
           </div>
         </Section>
 
+        {/* ── PREFERENCES ───────────────────────────────────────────────── */}
         <Section title="⚙️ Preferences">
-
-          {/* Daily Reminder */}
-          <div style={{ padding: '14px 18px', borderBottom: reminderOn ? '1px solid var(--border-subtle)' : 'none',
-            display: 'flex', alignItems: 'center', gap: '14px' }}>
-            <span style={{ fontSize: '1.1rem', width: '22px', textAlign: 'center' }}>⏰</span>
-            <div style={{ flex: 1 }}>
-              <p style={{ fontSize: '0.93rem', color: 'var(--text-primary)' }}>Daily Reminder</p>
-              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-                {reminderOn
-                  ? `Reminder set for ${formatTimeAMPM(reminderTime)} every day`
-                  : 'Get a daily notification to read the Bible'}
-              </p>
-            </div>
-            <Toggle on={reminderOn} onToggle={toggleReminder} />
-          </div>
-
-          {/* Reminder time picker — only shown when reminder is on */}
-          {reminderOn && (
-            <div style={{ padding: '12px 18px', display: 'flex', alignItems: 'center', gap: '14px', background: 'rgba(var(--accent-rgb),0.04)' }}>
-              <span style={{ fontSize: '1.1rem', width: '22px', textAlign: 'center' }}>🕐</span>
-              <div style={{ flex: 1 }}>
-                <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>
-                  Reminder Time <span style={{ color: 'var(--accent-gold)', fontWeight: 600, marginLeft: '4px' }}>({formatTimeAMPM(reminderTime)})</span>
-                </p>
-                <input
-                  id="reminder-time-input"
-                  type="time"
-                  value={reminderTime}
-                  onChange={handleReminderTimeChange}
-                  style={{
-                    background: 'var(--bg-secondary)',
-                    border: '1px solid var(--border)',
-                    borderRadius: '8px',
-                    color: 'var(--text-primary)',
-                    fontSize: '1rem',
-                    padding: '6px 12px',
-                    fontFamily: 'Inter, sans-serif',
-                    cursor: 'pointer',
-                    outline: 'none'
-                  }}
-                />
-              </div>
-              {notifPerm !== 'granted' && (
-                <p style={{ fontSize: '0.72rem', color: 'var(--error)', maxWidth: '120px', textAlign: 'right' }}>
-                  Allow notifications in browser
-                </p>
-              )}
-            </div>
-          )}
+          <DailyReminder
+            reminderOn={reminderOn}
+            reminderTime={reminderTime}
+            permissionStatus={permissionStatus}
+            toggleReminder={toggleReminder}
+            changeReminderTime={changeReminderTime}
+            triggerTestNotification={triggerTestNotification}
+            isGuest={isGuest}
+          />
         </Section>
 
         {/* ── APP INFO ──────────────────────────────────────────────────── */}
@@ -427,8 +383,7 @@ export default function SettingsScreen() {
           <Row icon="📤" label="Share with Friends" onClick={() => {
             if (navigator.share) navigator.share({ title: 'Sacred Word', text: 'Read the Bible in multiple languages!', url: window.location.origin })
             else { navigator.clipboard.writeText(window.location.origin); showToast('Link copied! 📋') }
-          }} />
-          <Row icon="📖" label="About Scripture" value="godlytalias API" last />
+          }} last />
         </Section>
 
         {/* ── ACCOUNT ───────────────────────────────────────────────────── */}
@@ -493,3 +448,50 @@ export default function SettingsScreen() {
     </div>
   )
 }
+
+// ── Static Sub-components ───────────────────────────────────────────────────
+const Section = ({ title, children }) => (
+  <div style={{ marginBottom: '24px' }}>
+    <h4 style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase',
+      letterSpacing: '0.14em', marginBottom: '10px', paddingLeft: '2px' }}>{title}</h4>
+    <div className="card" style={{ border: '1px solid var(--border-subtle)', padding: 0, overflow: 'hidden' }}>
+      {children}
+    </div>
+  </div>
+)
+
+const Row = ({ icon, label, value, onClick, danger, last, children }) => (
+  <div style={{ borderBottom: last ? 'none' : '1px solid var(--border-subtle)' }}>
+    <button
+      onClick={onClick}
+      disabled={!onClick && !children}
+      style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '14px',
+        padding: '14px 18px', background: 'none', border: 'none',
+        cursor: onClick ? 'pointer' : 'default', textAlign: 'left', transition: 'background 0.15s' }}
+      onMouseEnter={e => onClick && (e.currentTarget.style.background = 'rgba(255,255,255,0.03)')}
+      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+    >
+      <span style={{ fontSize: '1.1rem', width: '22px', textAlign: 'center' }}>{icon}</span>
+      <span style={{ flex: 1, color: danger ? 'var(--error)' : 'var(--text-primary)', fontSize: '0.93rem' }}>{label}</span>
+      {value && <span style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>{value}</span>}
+      {onClick && <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginLeft: '4px' }}>›</span>}
+    </button>
+    {children}
+  </div>
+)
+
+const Toggle = ({ on, onToggle }) => (
+  <div onClick={onToggle} style={{
+    width: '44px', height: '24px', borderRadius: '12px', flexShrink: 0,
+    background: on ? 'var(--accent-gold)' : 'var(--border)',
+    position: 'relative', cursor: 'pointer', transition: 'background 0.25s'
+  }}>
+    <div style={{
+      position: 'absolute', top: '3px',
+      left: on ? '23px' : '3px',
+      width: '18px', height: '18px', borderRadius: '50%',
+      background: '#fff', transition: 'left 0.25s',
+      boxShadow: '0 1px 4px rgba(0,0,0,0.25)'
+    }} />
+  </div>
+)

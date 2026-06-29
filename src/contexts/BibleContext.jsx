@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react'
 import { generateReadingPlan, READING_PLANS_LIST } from '../utils/readingPlanGenerator'
 import { useAuth } from './AuthContext'
 import { VERSE_OF_THE_DAY_365 } from '../utils/dailyVerses'
+import { useReminder } from '../hooks/useReminder'
 
 const BibleContext = createContext(null)
 
@@ -246,121 +247,6 @@ export function BibleProvider({ children }) {
     return saved ? JSON.parse(saved) : null
   })
 
-  // ── Daily Reminder States & Schedulers ──────────────────────────────────────
-  const [reminderOn, setReminderOn] = useState(false)
-  const [reminderTime, setReminderTime] = useState('08:00')
-  const reminderTimerRef = React.useRef(null)
-
-  const getReminderOnKey = () => user ? `reminder_on_${user.id}` : null
-  const getReminderTimeKey = () => user ? `reminder_time_${user.id}` : null
-
-  const formatTimeAMPM = (timeStr) => {
-    if (!timeStr) return ''
-    const [hStr, mStr] = timeStr.split(':')
-    const h = parseInt(hStr, 10)
-    const ampm = h >= 12 ? 'PM' : 'AM'
-    const displayH = h % 12 === 0 ? 12 : h % 12
-    return `${displayH}:${mStr} ${ampm}`
-  }
-
-  // Load reminder settings
-  useEffect(() => {
-    if (isGuest || !user) {
-      setReminderOn(false)
-      return
-    }
-    const onKey = getReminderOnKey()
-    const timeKey = getReminderTimeKey()
-    if (onKey && timeKey) {
-      setReminderOn(localStorage.getItem(onKey) === 'true')
-      setReminderTime(localStorage.getItem(timeKey) || '08:00')
-    }
-  }, [user, isGuest])
-
-  const scheduleNextReminder = (timeStr) => {
-    if (reminderTimerRef.current) clearTimeout(reminderTimerRef.current)
-    if (!user || isGuest) return
-
-    const [h, m] = timeStr.split(':').map(Number)
-    const now = new Date()
-    const next = new Date(now)
-    next.setHours(h, m, 0, 0)
-    if (next <= now) next.setDate(next.getDate() + 1)
-    const ms = next - now
-
-    console.log(`[Reminder] Scheduled daily calendar notification in ${Math.round(ms / 1000)}s at ${timeStr}`);
-
-    reminderTimerRef.current = setTimeout(() => {
-      if (Notification.permission === 'granted' && !isGuest && user) {
-        new Notification('Sacred Word 📖', {
-          body: `Hi ${user.user_metadata?.name || 'Beloved'}, it's time for your daily Bible reading. Keep your streak alive!`,
-          icon: '/logo.jpg'
-        })
-      }
-      scheduleNextReminder(timeStr) // reschedule for next day
-    }, ms)
-  }
-
-  // Monitor changes to reminder settings and reschedule
-  useEffect(() => {
-    if (reminderOn && user && !isGuest) {
-      scheduleNextReminder(reminderTime)
-    } else {
-      if (reminderTimerRef.current) {
-        clearTimeout(reminderTimerRef.current)
-        reminderTimerRef.current = null
-      }
-    }
-    return () => {
-      if (reminderTimerRef.current) clearTimeout(reminderTimerRef.current)
-    }
-  }, [reminderOn, reminderTime, user, isGuest])
-
-  const toggleReminder = async () => {
-    if (isGuest || !user) {
-      showToast('Daily reminders are only available for registered accounts. Please sign in!')
-      return
-    }
-
-    if (!reminderOn) {
-      if (typeof Notification === 'undefined') {
-        showToast('Notifications are not supported on this device')
-        return
-      }
-      let perm = Notification.permission
-      if (perm === 'default') {
-        perm = await Notification.requestPermission()
-      }
-      if (perm !== 'granted') {
-        showToast('Please allow notifications in your browser settings')
-        return
-      }
-
-      const onKey = getReminderOnKey()
-      if (onKey) {
-        localStorage.setItem(onKey, 'true')
-        setReminderOn(true)
-        showToast(`⏰ Reminder set for ${formatTimeAMPM(reminderTime)} daily`)
-      }
-    } else {
-      const onKey = getReminderOnKey()
-      if (onKey) {
-        localStorage.setItem(onKey, 'false')
-        setReminderOn(false)
-        showToast('Reminder turned off')
-      }
-    }
-  }
-
-  const changeReminderTime = (timeStr) => {
-    const timeKey = getReminderTimeKey()
-    if (timeKey) {
-      localStorage.setItem(timeKey, timeStr)
-      setReminderTime(timeStr)
-      showToast(`⏰ Reminder time set to ${formatTimeAMPM(timeStr)}`)
-    }
-  }
-
   // Global Session Timer: Increments timeSpent and completes registered user streak goals
   useEffect(() => {
     const key = getStreakKey()
@@ -442,6 +328,25 @@ export function BibleProvider({ children }) {
   const showToast = (message, duration = 2500) => {
     setToast(message)
     setTimeout(() => setToast(null), duration)
+  }
+
+  // ── Daily Reminder (powered by useReminder hook + Capacitor LocalNotifications) ──
+  const {
+    reminderOn,
+    reminderTime,
+    permissionStatus,
+    toggleReminder,
+    changeReminderTime,
+    triggerTestNotification
+  } = useReminder(user, isGuest, showToast)
+
+  const formatTimeAMPM = (timeStr) => {
+    if (!timeStr) return ''
+    const [hStr, mStr] = timeStr.split(':')
+    const h = parseInt(hStr, 10)
+    const ampm = h >= 12 ? 'PM' : 'AM'
+    const displayH = h % 12 === 0 ? 12 : h % 12
+    return `${displayH}:${mStr} ${ampm}`
   }
 
   const verseOfTheDay = () => {
@@ -555,7 +460,7 @@ export function BibleProvider({ children }) {
       selectedVerse, setSelectedVerse,
       activePlan, startPlan, toggleReadingComplete, quitPlan,
       recordChapterRead,
-      reminderOn, reminderTime, toggleReminder, changeReminderTime, formatTimeAMPM,
+      reminderOn, reminderTime, permissionStatus, toggleReminder, changeReminderTime, triggerTestNotification, formatTimeAMPM,
     }}>
       {children}
     </BibleContext.Provider>

@@ -1,0 +1,3 @@
+# SPA redirection rule for Netlify, Cloudflare Pages, etc.
+# Redirects all routing requests to index.html so React Router can handle them.
+/*    /index.html   200

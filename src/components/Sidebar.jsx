@@ -39,15 +39,15 @@ export default function Sidebar() {
         {/* Top Logo Container */}
         <div className="sidebar-logo-container">
           <img 
-            src="/logo.jpg" 
-            alt="Logo" 
+            src="/logo.png" 
+            alt="Sacred Word Logo" 
             className="sidebar-logo" 
             onClick={() => handleNavClick('/')}
-            style={{ cursor: 'pointer' }}
+            style={{ cursor: 'pointer', borderRadius: '14px', border: 'none' }}
           />
           {isExpanded && (
             <span className="sidebar-logo-text">
-              Kristhu Krupa
+              Sacred Word
             </span>
           )}
         </div>
