@@ -85,13 +85,9 @@ export default function DailyReminder({ reminderOn, reminderTime, permissionStat
           />
 
           {/* Test & Debug Actions */}
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
+          <div className="reminder-test-row" style={{
             background: 'rgba(var(--accent-rgb), 0.03)',
             borderRadius: '10px',
-            padding: '10px 14px',
             border: '1.5px dashed var(--border-subtle)',
             marginTop: '6px'
           }}>
@@ -104,6 +100,7 @@ export default function DailyReminder({ reminderOn, reminderTime, permissionStat
             <button
               type="button"
               onClick={triggerTestNotification}
+              className="reminder-test-btn"
               style={{
                 background: 'transparent',
                 border: '1px solid var(--accent-gold)',

@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useBible, BIBLE_LANGUAGES, BIBLE_BOOKS } from '../contexts/BibleContext'
 import { useAuth } from '../contexts/AuthContext'
+import { Bookmark } from 'lucide-react'
 
 export default function HomeScreen() {
   const navigate = useNavigate()
@@ -571,12 +572,26 @@ export default function HomeScreen() {
                 <button
                   className={`bookmark-btn ${isBookmarked(votd.reference) ? 'saved' : ''}`}
                   onClick={() => addBookmark({ id: votd.reference, reference: votd.reference, text: votd.text })}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    background: isBookmarked(votd.reference) ? 'rgba(var(--accent-rgb),0.08)' : 'transparent',
+                    border: '1px solid var(--border-subtle)',
+                    borderRadius: '8px',
+                    padding: '8px',
+                    cursor: 'pointer',
+                    color: isBookmarked(votd.reference) ? 'var(--accent-gold)' : 'var(--text-muted)',
+                    transition: 'all 0.2s',
+                    width: '34px',
+                    height: '34px'
+                  }}
                 >
-                  {isBookmarked(votd.reference) ? '🔖' : '🕮'}
+                  <Bookmark size={16} fill={isBookmarked(votd.reference) ? 'currentColor' : 'none'} style={{ strokeWidth: 2 }} />
                 </button>
                 <button
                   onClick={() => handleReadVotd(votd.reference)}
-                  style={{ background: 'rgba(var(--accent-rgb),0.1)', border: '1px solid var(--border)', borderRadius: '8px', padding: '6px 14px', color: 'var(--accent-gold)', fontSize: '0.8rem', cursor: 'pointer' }}
+                  style={{ background: 'rgba(var(--accent-rgb),0.1)', border: '1px solid var(--border)', borderRadius: '8px', padding: '6px 14px', color: 'var(--accent-gold)', fontSize: '0.8rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', height: '34px' }}
                 >
                   Read →
                 </button>
@@ -598,14 +613,34 @@ export default function HomeScreen() {
               <button
                 key={item.label}
                 onClick={item.action}
-                className="card"
-                style={{ textAlign: 'left', cursor: 'pointer', transition: 'all 0.2s', border: '1px solid var(--border-subtle)' }}
+                className="card quick-access-card"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '16px',
+                  textAlign: 'left',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  border: '1px solid var(--border-subtle)',
+                  padding: '16px 20px',
+                  width: '100%',
+                }}
                 onMouseEnter={e => e.currentTarget.style.borderColor = 'rgba(var(--accent-rgb),0.3)'}
                 onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border-subtle)'}
               >
-                <div style={{ fontSize: '1.5rem', marginBottom: '8px' }}>{item.icon}</div>
-                <div style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: '2px' }}>{item.label}</div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{item.desc}</div>
+                <div style={{
+                  fontSize: '1.8rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0
+                }}>
+                  {item.icon}
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
+                  <div style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--text-primary)' }}>{item.label}</div>
+                  <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.desc}</div>
+                </div>
               </button>
             ))}
           </div>

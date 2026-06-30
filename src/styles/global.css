@@ -886,5 +886,55 @@ a { text-decoration: none; color: inherit; }
   box-shadow: 0 0 16px rgba(59, 130, 246, 0.2);
 }
 
+/* Responsive Quick Access Cards styling */
+.quick-access-card {
+  padding: 16px 20px !important;
+  gap: 16px !important;
+  display: flex !important;
+  align-items: center !important;
+  height: 100% !important;
+}
+
+@media (max-width: 480px) {
+  .quick-access-card {
+    gap: 10px !important;
+    padding: 12px 14px !important;
+  }
+  .quick-access-card > div:first-child {
+    font-size: 1.4rem !important; /* Smaller icon size */
+  }
+  .quick-access-card > div:last-child > div:first-child {
+    font-size: 0.85rem !important; /* Smaller label text */
+  }
+  .quick-access-card > div:last-child > div:last-child {
+    font-size: 0.7rem !important; /* Smaller description text */
+  }
+}
+
+/* Responsive Daily Reminder alert bar styling */
+.reminder-test-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  gap: 12px;
+}
+
+@media (max-width: 480px) {
+  .reminder-test-row {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 8px !important;
+    text-align: center !important;
+  }
+  .reminder-test-row > div {
+    justify-content: center !important;
+  }
+  .reminder-test-row button {
+    width: 100% !important;
+  }
+}
+
+
 
 

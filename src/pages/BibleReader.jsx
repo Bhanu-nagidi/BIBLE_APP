@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { useBible, BIBLE_BOOKS, BIBLE_LANGUAGES } from '../contexts/BibleContext'
 import { useBibleAPI } from '../hooks/useBibleAPI'
 import AudioPlayer from '../components/AudioPlayer'
@@ -9,6 +9,7 @@ import { getLocalizedBookName } from '../utils/bibleBookNames'
 
 export default function BibleReader() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { selectedLanguage, changeLanguage, currentBook, setCurrentBook, currentChapter, setCurrentChapter, addBookmark, isBookmarked, fontSize, showToast, selectedVerse, setSelectedVerse, recordChapterRead } = useBible()
   const { getChapter } = useBibleAPI(selectedLanguage.code)
 
@@ -94,6 +95,14 @@ export default function BibleReader() {
       setSelectedVerse(null)
     }
   }, [setSelectedVerse])
+
+  // Automatically show audio player if "?audio=1" or "?audio=true" is passed in URL
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    if (params.get('audio') === '1' || params.get('audio') === 'true') {
+      setShowAudio(true)
+    }
+  }, [location.search])
 
 
   const nextChapter = () => {

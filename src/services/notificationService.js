@@ -60,13 +60,11 @@ export const notificationService = {
                   hour: parseInt(hour, 10),
                   minute: parseInt(minute, 10)
                 },
-                allowWhileIdle: true, // Support Exact Alarm / Doze mode
-                repeats: true
+                every: 'day',
+                allowWhileIdle: true
               },
-              sound: 'beep.wav', // Customizable notification sound support
-              smallIcon: 'ic_stat_icon_config_sample',
-              iconColor: '#d4a853',
-              actionTypeId: 'OPEN_BIBLE',
+              sound: 'beep.wav',
+              iconColor: '#4ebfa9',
               extra: {
                 route: '/bible'
               }
