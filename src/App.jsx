@@ -52,7 +52,7 @@ function SetupBanner() {
 }
 
 function AppRoutes() {
-  const { user, isGuest, loading } = useAuth()
+  const { user, isGuest, loading, passwordRecoveryMode } = useAuth()
   const { toast } = useBible()
   const navigate = useNavigate()
 
@@ -74,7 +74,7 @@ function AppRoutes() {
     )
   }
 
-  const isAuthenticated = user || isGuest
+  const isAuthenticated = (user || isGuest) && !passwordRecoveryMode
 
   return (
     <>

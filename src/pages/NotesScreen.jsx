@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useBible, BIBLE_BOOKS } from '../contexts/BibleContext'
 import { useAuth } from '../contexts/AuthContext'
 import { Plus, Search, Trash2, Edit3, BookOpen, Save, X, Bookmark } from 'lucide-react'
+import { syncService } from '../services/syncService'
 
 export default function NotesScreen() {
   const navigate = useNavigate()
@@ -37,8 +38,13 @@ export default function NotesScreen() {
     if (key) {
       localStorage.setItem(key, JSON.stringify(updatedNotes))
       setNotes(updatedNotes)
+      
+      if (user) {
+        syncService.updateDebounced(user.id, 'notes', updatedNotes)
+      }
     }
   }
+
 
   const handleOpenNew = () => {
     setEditingNote(null)

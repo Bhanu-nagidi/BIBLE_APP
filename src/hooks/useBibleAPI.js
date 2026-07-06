@@ -1,9 +1,10 @@
 import { useCallback } from 'react'
 import { BIBLE_BOOKS } from '../contexts/BibleContext'
 
-// Raw JSON from godlytalias/Bible-Database
-const GITHUB_RAW = 'https://raw.githubusercontent.com/godlytalias/Bible-Database/master'
+const GITHUB_RAW = 'https://raw.githubusercontent.com/Bhanu-nagidi/Bible-Database/main'
 
+// NOTE: the repo's root folder is itself called "Telugu" and contains the
+// Telugu Bible.json directly, plus one subfolder per other language.
 const LANG_PATH_MAP = {
   en:  'English',
   hi:  'Hindi',
@@ -11,7 +12,7 @@ const LANG_PATH_MAP = {
   ta:  'Tamil',
   ml:  'Malayalam',
   kn:  'Kannada',
-  or:  'Oriya',
+  or:  'Odia',      // repo folder is "Odia", not "Oriya"
   gu:  'Gujarati',
   bn:  'Bengali',
   pa:  'Punjabi',
@@ -122,9 +123,19 @@ async function loadBible(langCode) {
     if (!res.ok) throw new Error(`Failed to load packaged English Bible`)
     data = await res.json()
   } else {
-    // Other languages are fetched over network and permanently stored locally in IndexedDB
+    // Other languages are fetched over network and permanently stored locally in IndexedDB.
+    //
+    // The repo's ROOT folder is itself named "Telugu" and holds Bible.json
+    // directly for Telugu. Every other language lives one level deeper, in
+    // its own subfolder under that same root, e.g. Telugu/Hindi/Bible.json.
     const path = LANG_PATH_MAP[langCode] || 'English'
-    const res = await fetch(`${GITHUB_RAW}/${path}/bible.json`)
+
+    const url =
+      langCode === 'te'
+        ? `${GITHUB_RAW}/Telugu/Bible.json`
+        : `${GITHUB_RAW}/Telugu/${path}/Bible.json`
+
+    const res = await fetch(url)
     if (!res.ok) throw new Error(`Failed to load Bible from remote CDN: HTTP ${res.status}`)
     data = await res.json()
   }

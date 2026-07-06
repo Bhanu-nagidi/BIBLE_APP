@@ -7,6 +7,14 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 export const supabaseConfigured = !!(supabaseUrl && supabaseAnonKey)
 
 // Only create the client when keys are present
+// persistSession=true + autoRefreshToken=true keeps users logged in across restarts
 export const supabase = supabaseConfigured
-  ? createClient(supabaseUrl, supabaseAnonKey)
+  ? createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+        storageKey: 'sacred-word-auth',
+      }
+    })
   : null

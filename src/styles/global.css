@@ -775,8 +775,8 @@ a { text-decoration: none; color: inherit; }
   }
 }
 
-/* Extra small mobile screens (e.g. iPhone SE, screen width <= 360px) */
-@media (max-width: 360px) {
+/* Extra small mobile screens (e.g. iPhone SE, screen width < 360px) */
+@media (max-width: 359px) {
   .quick-access-grid {
     grid-template-columns: 1fr !important; /* switch to single column to avoid text wrapping */
     gap: 6px !important;
@@ -895,7 +895,7 @@ a { text-decoration: none; color: inherit; }
   height: 100% !important;
 }
 
-@media (max-width: 480px) {
+@media (max-width: 359px) {
   .quick-access-card {
     gap: 10px !important;
     padding: 12px 14px !important;

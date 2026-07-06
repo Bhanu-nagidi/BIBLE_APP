@@ -1,72 +1,41 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { notificationService } from '../services/notificationService';
-import { getMsUntilTime } from '../utils/reminderScheduler';
+import { syncService } from '../services/syncService';
 
 export function useReminder(user, isGuest, showToast) {
   const [reminderOn, setReminderOn] = useState(false);
   const [reminderTime, setReminderTime] = useState('08:00');
   const [permissionStatus, setPermissionStatus] = useState('default');
-  const webTimerRef = useRef(null);
 
-
-
-  // 1. Initial State Sync
+  // ─── 1. Load saved state on mount ───────────────────────────────────────────
   useEffect(() => {
     if (!user?.id || isGuest) {
       setReminderOn(false);
       return;
     }
 
-    const onKey = `reminder_on_${user.id}`;
+    const onKey  = `reminder_on_${user.id}`;
     const timeKey = `reminder_time_${user.id}`;
 
-    const savedOn = localStorage.getItem(onKey) === 'true';
-    setReminderOn(savedOn);
-
+    const savedOn   = localStorage.getItem(onKey) === 'true';
     const savedTime = localStorage.getItem(timeKey) || '08:00';
+
+    setReminderOn(savedOn);
     setReminderTime(savedTime);
 
-    // Check permission status
-    notificationService.checkPermissions().then(status => {
-      setPermissionStatus(status);
-    });
+    // Refresh permission status
+    notificationService.checkPermissions().then(setPermissionStatus);
+
+    // If reminder was ON, re-send the schedule to the SW (in case the SW was
+    // restarted / updated since the last visit).
+    if (savedOn) {
+      const userName = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Beloved';
+      const [h, m]   = savedTime.split(':');
+      notificationService.scheduleDailyReminder(h, m, userName).catch(console.warn);
+    }
   }, [user?.id, isGuest]);
 
-  // 2. Web Fallback Scheduler (handles background notification trigger if running in browser)
-  const scheduleWebFallback = useCallback((timeStr) => {
-    if (webTimerRef.current) clearTimeout(webTimerRef.current);
-    if (!user?.id || isGuest || !reminderOn) return;
-
-    const ms = getMsUntilTime(timeStr);
-    const userName = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Beloved';
-
-    webTimerRef.current = setTimeout(async () => {
-      // Trigger browser notification
-      const perm = await notificationService.checkPermissions();
-      if (perm === 'granted') {
-        await notificationService.sendTestNotification(userName);
-      }
-      // Re-schedule for next day
-      scheduleWebFallback(timeStr);
-    }, ms);
-  }, [user?.id, user?.user_metadata?.name, user?.email, isGuest, reminderOn]);
-
-  // 3. Clear Web timer on unmount or when config changes
-  useEffect(() => {
-    if (reminderOn && !isGuest && user?.id) {
-      scheduleWebFallback(reminderTime);
-    } else {
-      if (webTimerRef.current) {
-        clearTimeout(webTimerRef.current);
-        webTimerRef.current = null;
-      }
-    }
-    return () => {
-      if (webTimerRef.current) clearTimeout(webTimerRef.current);
-    };
-  }, [reminderOn, reminderTime, user?.id, isGuest, scheduleWebFallback]);
-
-  // 4. Toggle Reminder ON/OFF
+  // ─── 2. Toggle Reminder ON / OFF ────────────────────────────────────────────
   const toggleReminder = useCallback(async () => {
     if (isGuest || !user?.id) {
       showToast('Daily reminders are only available for registered accounts. Please sign in!');
@@ -76,35 +45,44 @@ export function useReminder(user, isGuest, showToast) {
     const onKey = `reminder_on_${user.id}`;
 
     if (!reminderOn) {
-      // Request permission
+      // ── Turn ON ──────────────────────────────────────────────────────────────
       const granted = await notificationService.requestPermissions();
       const updatedStatus = await notificationService.checkPermissions();
       setPermissionStatus(updatedStatus);
 
       if (!granted) {
-        showToast('Please enable notification permissions in your browser/device settings.');
+        showToast('Please enable notification permissions in your browser / device settings.');
         return;
       }
 
-      // Save setting & schedule
       localStorage.setItem(onKey, 'true');
       setReminderOn(true);
 
-      const userName = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Beloved';
-      const [h, m] = reminderTime.split(':');
-      await notificationService.scheduleDailyReminder(h, m, userName);
+      syncService.updateDebounced(user.id, 'reminders', { on: true, time: reminderTime });
 
-      showToast('⏰ Daily reminder enabled!');
+      const userName = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Beloved';
+      const [h, m]   = reminderTime.split(':');
+      const scheduled = await notificationService.scheduleDailyReminder(h, m, userName);
+
+      if (scheduled) {
+        showToast('⏰ Daily reminder enabled!');
+      } else {
+        showToast('Could not schedule reminder. Check notification permissions.');
+      }
+
     } else {
-      // Cancel & Turn Off
+      // ── Turn OFF ─────────────────────────────────────────────────────────────
       localStorage.setItem(onKey, 'false');
       setReminderOn(false);
+
+      syncService.updateDebounced(user.id, 'reminders', { on: false, time: reminderTime });
+
       await notificationService.cancelDailyReminder();
       showToast('Reminder turned off.');
     }
   }, [reminderOn, reminderTime, user?.id, user?.user_metadata?.name, user?.email, isGuest, showToast]);
 
-  // 5. Change Time & Reschedule
+  // ─── 3. Change Time & Reschedule ────────────────────────────────────────────
   const changeReminderTime = useCallback(async (newTimeStr) => {
     if (!user?.id) return;
     const timeKey = `reminder_time_${user.id}`;
@@ -112,22 +90,30 @@ export function useReminder(user, isGuest, showToast) {
     localStorage.setItem(timeKey, newTimeStr);
     setReminderTime(newTimeStr);
 
+    syncService.updateDebounced(user.id, 'reminders', { on: reminderOn, time: newTimeStr });
+
     if (reminderOn && !isGuest) {
       const userName = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Beloved';
-      const [h, m] = newTimeStr.split(':');
+      const [h, m]   = newTimeStr.split(':');
       await notificationService.scheduleDailyReminder(h, m, userName);
+      showToast(`⏰ Reminder rescheduled!`);
     }
-  }, [reminderOn, user?.id, user?.user_metadata?.name, user?.email, isGuest]);
+  }, [reminderOn, user?.id, user?.user_metadata?.name, user?.email, isGuest, showToast]);
 
-  // 6. Manual Test Action
+  // ─── 4. Manual Test ─────────────────────────────────────────────────────────
   const triggerTestNotification = useCallback(async () => {
     if (!user?.id) return;
     const userName = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Beloved';
     const sent = await notificationService.sendTestNotification(userName);
+
+    // Refresh permission status — it may have changed while we were asking
+    const updatedStatus = await notificationService.checkPermissions();
+    setPermissionStatus(updatedStatus);
+
     if (sent) {
       showToast('Test notification sent! ✅');
     } else {
-      showToast('Could not send notification. Check permissions.');
+      showToast('Could not send notification. Check permissions in browser/device settings.');
     }
   }, [user?.id, user?.user_metadata?.name, user?.email, showToast]);
 

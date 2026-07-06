@@ -3,6 +3,7 @@ import { useBible, BIBLE_LANGUAGES } from '../contexts/BibleContext'
 import { useAuth } from '../contexts/AuthContext'
 import { useNavigate } from 'react-router-dom'
 import DailyReminder from '../components/DailyReminder'
+import { syncService } from '../services/syncService'
 
 const parse24to12 = (timeStr) => {
   const [hStr, mStr] = (timeStr || '08:00').split(':')
@@ -63,6 +64,17 @@ export default function SettingsScreen() {
 
   const notifPerm = typeof Notification !== 'undefined' ? Notification.permission : 'default'
 
+  const getSettingsPayload = (themeVal, fontStyleVal, lineSpacingVal, dailyVerseVal) => {
+    return {
+      theme: themeVal !== undefined ? themeVal : theme,
+      fontStyle: fontStyleVal !== undefined ? fontStyleVal : fontStyle,
+      lineSpacing: lineSpacingVal !== undefined ? lineSpacingVal : lineSpacing,
+      dailyVerse: dailyVerseVal !== undefined ? dailyVerseVal : dailyVerse,
+      language: JSON.parse(localStorage.getItem('bible_language') || 'null'),
+      fontSize: parseInt(localStorage.getItem('bible_fontsize') || '18')
+    }
+  }
+
   const changeTheme = (newTheme) => {
     setTheme(newTheme)
     localStorage.setItem('app_theme', newTheme)
@@ -71,6 +83,9 @@ export default function SettingsScreen() {
     } else {
       document.documentElement.setAttribute('data-theme', newTheme)
     }
+    if (user) {
+      syncService.updateDebounced(user.id, 'settings', getSettingsPayload(newTheme, undefined, undefined, undefined))
+    }
   }
 
   const changeFontStyle = (s) => {
@@ -78,12 +93,18 @@ export default function SettingsScreen() {
     localStorage.setItem('font_style', s)
     document.documentElement.style.setProperty('--reader-font',
       s === 'serif' ? "'Crimson Pro', serif" : "'Inter', sans-serif")
+    if (user) {
+      syncService.updateDebounced(user.id, 'settings', getSettingsPayload(undefined, s, undefined, undefined))
+    }
   }
 
   const changeLineSpacing = (s) => {
     setLineSpacing(s)
     localStorage.setItem('line_spacing', s)
     showToast('Line spacing updated')
+    if (user) {
+      syncService.updateDebounced(user.id, 'settings', getSettingsPayload(undefined, undefined, s, undefined))
+    }
   }
 
   const toggleDailyVerse = () => {
@@ -91,6 +112,9 @@ export default function SettingsScreen() {
     setDailyVerse(next)
     localStorage.setItem('daily_verse', String(next))
     showToast(next ? 'Daily verse enabled' : 'Daily verse disabled')
+    if (user) {
+      syncService.updateDebounced(user.id, 'settings', getSettingsPayload(undefined, undefined, undefined, next))
+    }
   }
 
   const submitRating = (stars) => {

@@ -3,6 +3,7 @@ import { generateReadingPlan, READING_PLANS_LIST } from '../utils/readingPlanGen
 import { useAuth } from './AuthContext'
 import { VERSE_OF_THE_DAY_365 } from '../utils/dailyVerses'
 import { useReminder } from '../hooks/useReminder'
+import { syncService } from '../services/syncService'
 
 const BibleContext = createContext(null)
 
@@ -90,7 +91,7 @@ export const BIBLE_BOOKS = [
   { id: '2JN', name: '2 John', chapters: 1, testament: 'NT' },
   { id: '3JN', name: '3 John', chapters: 1, testament: 'NT' },
   { id: 'JUD', name: 'Jude', chapters: 1, testament: 'NT' },
-  { id: 'REV', name: 'Revelation', chapters: 22, testament: 'NT' },
+  { id: 'REV', name: 'Revelation', chapters: 22, testament: 'NT' }
 ]
 
 function migrateBookmarks(savedBookmarks) {
@@ -156,16 +157,28 @@ function migrateBookmarks(savedBookmarks) {
 }
 
 export function BibleProvider({ children }) {
+  const { user, isGuest } = useAuth()
+
   const [selectedLanguage, setSelectedLanguage] = useState(() => {
     const saved = localStorage.getItem('bible_language')
     return saved ? JSON.parse(saved) : BIBLE_LANGUAGES[0]
   })
-  const [bookmarks, setBookmarks] = useState(() => {
-    const saved = JSON.parse(localStorage.getItem('bible_bookmarks') || '[]')
-    return migrateBookmarks(saved)
-  })
-  const { user, isGuest } = useAuth()
+  
+  const getBookmarksKey = () => {
+    if (user) return `bible_bookmarks_${user.id}`
+    if (isGuest) return 'bible_bookmarks_guest'
+    return 'bible_bookmarks'
+  }
+
+  const getActivePlanKey = () => {
+    if (user) return `bible_active_plan_${user.id}`
+    if (isGuest) return 'bible_active_plan_guest'
+    return 'bible_active_plan'
+  }
+
+  const [bookmarks, setBookmarks] = useState([])
   const [streak, setStreak] = useState({ count: 0, lastVisit: null, history: [], dailyDetails: {} })
+  const [activePlan, setActivePlan] = useState(null)
 
   const getStreakKey = () => {
     if (user) return `bible_streak_${user.id}`
@@ -180,6 +193,18 @@ export function BibleProvider({ children }) {
     userRef.current = user
     isGuestRef.current = isGuest
   }, [user, isGuest])
+
+  // Load and initialize settings, bookmarks, and plans on active user change
+  useEffect(() => {
+    const bkKey = getBookmarksKey()
+    const savedBk = localStorage.getItem(bkKey)
+    setBookmarks(migrateBookmarks(savedBk ? JSON.parse(savedBk) : []))
+
+    const planKey = getActivePlanKey()
+    const savedPlan = localStorage.getItem(planKey)
+    setActivePlan(savedPlan ? JSON.parse(savedPlan) : null)
+  }, [user, isGuest])
+
 
   // Load and initialize streak settings on active user change
   useEffect(() => {
@@ -242,10 +267,7 @@ export function BibleProvider({ children }) {
   const [isAudioPlaying, setIsAudioPlaying] = useState(false)
   const [toast, setToast] = useState(null)
   const [selectedVerse, setSelectedVerse] = useState(null)
-  const [activePlan, setActivePlan] = useState(() => {
-    const saved = localStorage.getItem('bible_active_plan')
-    return saved ? JSON.parse(saved) : null
-  })
+
 
   // Global Session Timer: Increments timeSpent and completes registered user streak goals
   useEffect(() => {
@@ -293,6 +315,11 @@ export function BibleProvider({ children }) {
 
       localStorage.setItem(activeKey, JSON.stringify(current))
       setStreak(current)
+
+      // Sync streak to Supabase debounced (run every 5 seconds to reduce writes)
+      if (user) {
+        syncService.updateDebounced(user.id, 'streak', current, 5000)
+      }
     }, 1000)
 
     return () => clearInterval(interval)
@@ -302,6 +329,16 @@ export function BibleProvider({ children }) {
     setSelectedLanguage(lang)
     localStorage.setItem('bible_language', JSON.stringify(lang))
     showToast(`Language changed to ${lang.name} (${lang.version})`)
+    if (user) {
+      syncService.updateDebounced(user.id, 'settings', {
+        theme: localStorage.getItem('app_theme') || 'light',
+        fontStyle: localStorage.getItem('font_style') || 'sans',
+        lineSpacing: localStorage.getItem('line_spacing') || 'normal',
+        dailyVerse: localStorage.getItem('daily_verse') !== 'false',
+        language: lang,
+        fontSize: fontSize
+      })
+    }
   }
 
   const addBookmark = (bookmark) => {
@@ -315,20 +352,37 @@ export function BibleProvider({ children }) {
       showToast('Verse bookmarked ✓')
     }
     setBookmarks(newBookmarks)
-    localStorage.setItem('bible_bookmarks', JSON.stringify(newBookmarks))
+    
+    const key = getBookmarksKey()
+    localStorage.setItem(key, JSON.stringify(newBookmarks))
+    
+    if (user) {
+      syncService.updateDebounced(user.id, 'bookmarks', newBookmarks)
+    }
   }
 
   const isBookmarked = (id) => bookmarks.some(b => b.id === id)
 
   const changeFontSize = (size) => {
     setFontSize(size)
-    localStorage.setItem('bible_fontsize', size)
+    localStorage.setItem('bible_fontsize', String(size))
+    if (user) {
+      syncService.updateDebounced(user.id, 'settings', {
+        theme: localStorage.getItem('app_theme') || 'light',
+        fontStyle: localStorage.getItem('font_style') || 'sans',
+        lineSpacing: localStorage.getItem('line_spacing') || 'normal',
+        dailyVerse: localStorage.getItem('daily_verse') !== 'false',
+        language: selectedLanguage,
+        fontSize: size
+      })
+    }
   }
 
   const showToast = (message, duration = 2500) => {
     setToast(message)
     setTimeout(() => setToast(null), duration)
   }
+
 
   // ── Daily Reminder (powered by useReminder hook + Capacitor LocalNotifications) ──
   const {
@@ -380,7 +434,13 @@ export function BibleProvider({ children }) {
       }
       console.log('[startPlan] setting new active plan:', newPlan);
       setActivePlan(newPlan)
-      localStorage.setItem('bible_active_plan', JSON.stringify(newPlan))
+      
+      const planKey = getActivePlanKey()
+      localStorage.setItem(planKey, JSON.stringify(newPlan))
+      
+      if (user) {
+        syncService.updateDebounced(user.id, 'activePlan', newPlan)
+      }
       showToast(`Started plan: ${planInfo.name}!`)
     } catch (err) {
       console.error('[startPlan] failed inside context:', err);
@@ -401,16 +461,20 @@ export function BibleProvider({ children }) {
       updatedCompleted[key] = true
       // Record a chapter read for today
       const todayKey = new Date().toDateString()
-      const key = getStreakKey()
-      if (key) {
-        const currentStreak = JSON.parse(localStorage.getItem(key) || '{}')
+      const keyStr = getStreakKey()
+      if (keyStr) {
+        const currentStreak = JSON.parse(localStorage.getItem(keyStr) || '{}')
         if (currentStreak.dailyDetails) {
           if (!currentStreak.dailyDetails[todayKey]) {
             currentStreak.dailyDetails[todayKey] = { timeSpent: 0, chaptersRead: 0 }
           }
           currentStreak.dailyDetails[todayKey].chaptersRead = (currentStreak.dailyDetails[todayKey].chaptersRead || 0) + 1
-          localStorage.setItem(key, JSON.stringify(currentStreak))
+          localStorage.setItem(keyStr, JSON.stringify(currentStreak))
           setStreak(currentStreak)
+          
+          if (user) {
+            syncService.updateDebounced(user.id, 'streak', currentStreak)
+          }
         }
       }
     }
@@ -420,14 +484,20 @@ export function BibleProvider({ children }) {
       completedReadings: updatedCompleted
     }
     setActivePlan(updatedPlan)
-    localStorage.setItem('bible_active_plan', JSON.stringify(updatedPlan))
+    
+    const planKey = getActivePlanKey()
+    localStorage.setItem(planKey, JSON.stringify(updatedPlan))
+    
+    if (user) {
+      syncService.updateDebounced(user.id, 'activePlan', updatedPlan)
+    }
   }
 
   // Record chapter read manually (called from BibleReader)
   const recordChapterRead = () => {
     const todayKey = new Date().toDateString()
-    const key = getStreakKey()
-    if (!key) return
+    const keyStr = getStreakKey()
+    if (!keyStr) return
     setStreak(prev => {
       const updated = { ...prev }
       if (!updated.dailyDetails) updated.dailyDetails = {}
@@ -435,16 +505,26 @@ export function BibleProvider({ children }) {
         updated.dailyDetails[todayKey] = { timeSpent: 0, chaptersRead: 0 }
       }
       updated.dailyDetails[todayKey].chaptersRead = (updated.dailyDetails[todayKey].chaptersRead || 0) + 1
-      localStorage.setItem(key, JSON.stringify(updated))
+      localStorage.setItem(keyStr, JSON.stringify(updated))
+      
+      if (user) {
+        syncService.updateDebounced(user.id, 'streak', updated)
+      }
       return updated
     })
   }
 
   const quitPlan = () => {
     setActivePlan(null)
-    localStorage.removeItem('bible_active_plan')
+    const planKey = getActivePlanKey()
+    localStorage.removeItem(planKey)
+    
+    if (user) {
+      syncService.updateDebounced(user.id, 'activePlan', null)
+    }
     showToast('Reading plan stopped.')
   }
+
 
   return (
     <BibleContext.Provider value={{
