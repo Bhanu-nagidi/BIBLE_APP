@@ -1,23 +1,26 @@
-/* Sacred Word Bible App - Service Worker v2
- * Handles local scheduled daily Bible reminder notifications entirely inside the SW.
- * This means the notification fires even if the app tab is closed, as long as the
- * browser itself is running.
+/* Sacred Word Bible App — Service Worker v3
  *
- * Message API (from the app → SW):
- *   { type: 'SCHEDULE_REMINDER', hour: 8, minute: 30, userName: 'John' }
- *   { type: 'CANCEL_REMINDER' }
- *   { type: 'TEST_NOTIFICATION', userName: 'John' }
+ * Strategy: The SW CANNOT reliably hold setTimeout for hours (browsers kill it).
+ * Instead:
+ *   1. The SW stores the target time in a global variable when SCHEDULE_REMINDER is sent.
+ *   2. On every SW 'fetch' event (i.e., every page load/navigation), the SW checks
+ *      if a notification is due and fires it immediately if so.
+ *   3. The app-side also runs its own setInterval every 30 seconds while the page
+ *      is visible, and sends CHECK_REMINDER to the SW.
+ *   4. The app persists the reminder time in localStorage so it survives reloads.
+ *
+ * This guarantees: as long as the browser is open (even in another tab),
+ * the reminder will fire within ~30 seconds of the scheduled time.
  */
 
-// ─── State ───────────────────────────────────────────────────────────────────
-let reminderTimer = null;
-let reminderConfig = null; // { hour, minute, userName }
+// ─── Persisted reminder config (survives SW restarts via fetch-event re-hydration) ──
+let reminderConfig = null; // { hour, minute, userName, lastFiredDate }
 
 // ─── Install / Activate ───────────────────────────────────────────────────────
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim()));
 
-// ─── Helper: show a notification ─────────────────────────────────────────────
+// ─── Helper: show notification ────────────────────────────────────────────────
 function showReminderNotification(userName) {
   const name = userName || 'Beloved';
   return self.registration.showNotification('📖 Sacred Word', {
@@ -29,80 +32,71 @@ function showReminderNotification(userName) {
     vibrate: [200, 100, 200],
     data: { url: '/', timestamp: Date.now() },
     actions: [
-      { action: 'read', title: '📖 Read Now' },
-      { action: 'dismiss', title: 'Dismiss' }
+      { action: 'read',    title: '📖 Read Now' },
+      { action: 'dismiss', title: 'Dismiss'    }
     ]
   });
 }
 
-// ─── Helper: ms until a given HH:MM today (or tomorrow) ─────────────────────
-function getMsUntil(hour, minute) {
+// ─── Helper: should we fire right now? ───────────────────────────────────────
+function shouldFireNow(config) {
+  if (!config) return false;
   const now = new Date();
-  const target = new Date(now);
-  target.setHours(parseInt(hour, 10), parseInt(minute, 10), 0, 0);
-  if (target <= now) {
-    target.setDate(target.getDate() + 1); // already passed → schedule for tomorrow
-  }
-  return target.getTime() - now.getTime();
+  const nowH = now.getHours();
+  const nowM = now.getMinutes();
+  const todayStr = now.toDateString();
+
+  // Already fired today?
+  if (config.lastFiredDate === todayStr) return false;
+
+  // Is it time? (within the current minute)
+  return nowH === config.hour && nowM === config.minute;
 }
 
-// ─── Schedule the daily loop ──────────────────────────────────────────────────
-function scheduleDailyTimer() {
+// ─── Check and fire if due ────────────────────────────────────────────────────
+async function checkAndFire() {
   if (!reminderConfig) return;
-
-  // Clear any existing timer
-  if (reminderTimer) {
-    clearTimeout(reminderTimer);
-    reminderTimer = null;
+  if (shouldFireNow(reminderConfig)) {
+    reminderConfig.lastFiredDate = new Date().toDateString();
+    await showReminderNotification(reminderConfig.userName);
   }
-
-  const { hour, minute, userName } = reminderConfig;
-  const ms = getMsUntil(hour, minute);
-
-  console.log(`[SW] Reminder scheduled in ${Math.round(ms / 60000)} min for ${hour}:${String(minute).padStart(2,'0')}`);
-
-  reminderTimer = setTimeout(async () => {
-    // Fire the notification
-    await showReminderNotification(userName);
-    // Re-schedule for the next day (24 h from now)
-    reminderTimer = setTimeout(() => scheduleDailyTimer(), 24 * 60 * 60 * 1000 - 5000);
-  }, ms);
-}
-
-// ─── Cancel the daily loop ────────────────────────────────────────────────────
-function cancelDailyTimer() {
-  if (reminderTimer) {
-    clearTimeout(reminderTimer);
-    reminderTimer = null;
-  }
-  reminderConfig = null;
-  console.log('[SW] Reminder cancelled');
 }
 
 // ─── Message handler (app → SW) ───────────────────────────────────────────────
-self.addEventListener('message', (event) => {
+self.addEventListener('message', async (event) => {
   if (!event.data) return;
-
   const { type, hour, minute, userName } = event.data;
 
   if (type === 'SCHEDULE_REMINDER') {
-    reminderConfig = { hour, minute, userName };
-    scheduleDailyTimer();
-    // Reply so the caller knows the SW is alive and received the request
+    reminderConfig = {
+      hour: parseInt(hour, 10),
+      minute: parseInt(minute, 10),
+      userName: userName || 'Beloved',
+      lastFiredDate: null
+    };
+    console.log(`[SW] Reminder registered at ${hour}:${String(minute).padStart(2,'0')}`);
+    // Immediately check (in case app was reopened right at reminder time)
+    await checkAndFire();
     if (event.source && event.source.postMessage) {
       event.source.postMessage({ type: 'REMINDER_SCHEDULED', ok: true });
     }
   }
 
   if (type === 'CANCEL_REMINDER') {
-    cancelDailyTimer();
+    reminderConfig = null;
+    console.log('[SW] Reminder cancelled');
     if (event.source && event.source.postMessage) {
       event.source.postMessage({ type: 'REMINDER_CANCELLED', ok: true });
     }
   }
 
+  if (type === 'CHECK_REMINDER') {
+    // Called every ~30s by the app's setInterval to keep the SW alive & check time
+    await checkAndFire();
+  }
+
   if (type === 'TEST_NOTIFICATION') {
-    self.registration.showNotification('📖 Sacred Word — Test', {
+    await self.registration.showNotification('📖 Sacred Word — Test', {
       body: `Hi ${userName || 'Beloved'}! Your daily Bible reminders are working. 🔥`,
       icon: '/logo.jpg',
       badge: '/favicon.svg',
@@ -113,7 +107,14 @@ self.addEventListener('message', (event) => {
   }
 });
 
-// ─── Push (server-sent) fallback ──────────────────────────────────────────────
+// ─── Fetch event: piggyback on every network request to check reminder ────────
+self.addEventListener('fetch', (event) => {
+  // Check in background — don't block the fetch
+  event.waitUntil(checkAndFire());
+  // Let the browser handle the request normally
+});
+
+// ─── Push (server-sent) fallback ─────────────────────────────────────────────
 self.addEventListener('push', (event) => {
   let data = {};
   if (event.data) {

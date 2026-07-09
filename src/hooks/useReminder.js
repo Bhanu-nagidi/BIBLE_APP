@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
-import { notificationService } from '../services/notificationService';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { notificationService, sendReminderHeartbeat, appSideReminderCheck } from '../services/notificationService';
 import { syncService } from '../services/syncService';
 
 export function useReminder(user, isGuest, showToast) {
@@ -34,6 +34,24 @@ export function useReminder(user, isGuest, showToast) {
       notificationService.scheduleDailyReminder(h, m, userName).catch(console.warn);
     }
   }, [user?.id, isGuest]);
+
+  // ─── 2. 30-second heartbeat — keeps SW alive and checks time precisely ──────
+  useEffect(() => {
+    if (!reminderOn || isGuest || !user?.id) return;
+
+    // Immediate check on mount/toggle
+    appSideReminderCheck();
+    sendReminderHeartbeat().catch(() => {});
+
+    const interval = setInterval(() => {
+      // App-side check — works even if SW is dead
+      appSideReminderCheck();
+      // SW heartbeat — wakes SW and triggers its own check
+      sendReminderHeartbeat().catch(() => {});
+    }, 30_000); // every 30 seconds
+
+    return () => clearInterval(interval);
+  }, [reminderOn, isGuest, user?.id]);
 
   // ─── 2. Toggle Reminder ON / OFF ────────────────────────────────────────────
   const toggleReminder = useCallback(async () => {

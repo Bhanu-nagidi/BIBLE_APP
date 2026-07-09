@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { Eye, EyeOff } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 
 // ─── Self-contained toast ────────────────────────────────────────────────────
@@ -63,6 +64,9 @@ export default function AuthScreen() {
   const [form, setForm] = useState({ name: '', email: '', password: '', newPassword: '', confirmPassword: '' })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  // Track visibility per field: password | newPassword | confirmPassword
+  const [showPass, setShowPass] = useState({ password: false, newPassword: false, confirmPassword: false })
+  const togglePass = (field) => setShowPass(prev => ({ ...prev, [field]: !prev[field] }))
   const { login, register, continueAsGuest, resetPassword, updatePassword, passwordRecoveryMode } = useAuth()
   const { toasts, addToast } = useToasts()
 
@@ -72,6 +76,34 @@ export default function AuthScreen() {
       setMode('new-password')
     }
   }, [passwordRecoveryMode])
+
+  // Detect and handle auth errors in the URL hash (e.g. from expired links)
+  useEffect(() => {
+    const hash = window.location.hash || ''
+    if (hash.startsWith('#') || hash.includes('error=')) {
+      // Handle either hash or query style parameters
+      const queryString = hash.includes('#') ? hash.substring(hash.indexOf('#') + 1) : hash
+      const params = new URLSearchParams(queryString)
+      const errorVal = params.get('error')
+      const errorCode = params.get('error_code')
+      const errorDesc = params.get('error_description')
+
+      if (errorVal) {
+        let displayError = 'Authentication error.'
+        if (errorCode === 'otp_expired' || (errorDesc && errorDesc.includes('expired'))) {
+          displayError = 'The confirmation link has expired. Please request a new verification email.'
+        } else if (errorDesc) {
+          displayError = decodeURIComponent(errorDesc).replace(/\+/g, ' ')
+        }
+
+        setError(displayError)
+        addToast(displayError, 'error')
+
+        // Clean up the URL hash so it doesn't persist
+        window.history.replaceState(null, '', window.location.pathname)
+      }
+    }
+  }, [])
 
   const handle = (e) => setForm(f => ({ ...f, [e.target.name]: e.target.value }))
 
@@ -346,15 +378,30 @@ export default function AuthScreen() {
                   </button>
                 )}
               </div>
-              <input
-                className="input-field"
-                name="password"
-                type="password"
-                placeholder={mode === 'register' ? 'Min. 6 characters' : 'Your password'}
-                value={form.password}
-                onChange={handle}
-                required
-              />
+              <div style={{ position: 'relative' }}>
+                <input
+                  className="input-field"
+                  name="password"
+                  type={showPass.password ? 'text' : 'password'}
+                  placeholder={mode === 'register' ? 'Min. 6 characters' : 'Your password'}
+                  value={form.password}
+                  onChange={handle}
+                  required
+                  style={{ paddingRight: '44px' }}
+                />
+                <button
+                  type="button"
+                  onClick={() => togglePass('password')}
+                  style={{
+                    position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)',
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    color: 'var(--text-muted)', display: 'flex', alignItems: 'center', padding: 0
+                  }}
+                  aria-label={showPass.password ? 'Hide password' : 'Show password'}
+                >
+                  {showPass.password ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
             </div>
           )}
 
@@ -363,34 +410,71 @@ export default function AuthScreen() {
             <>
               <div>
                 <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>New Password</label>
-                <input
-                  className="input-field"
-                  name="newPassword"
-                  type="password"
-                  placeholder="Min. 6 characters"
-                  value={form.newPassword}
-                  onChange={handle}
-                  required
-                />
+                <div style={{ position: 'relative' }}>
+                  <input
+                    className="input-field"
+                    name="newPassword"
+                    type={showPass.newPassword ? 'text' : 'password'}
+                    placeholder="Min. 6 characters"
+                    value={form.newPassword}
+                    onChange={handle}
+                    required
+                    style={{ paddingRight: '44px' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => togglePass('newPassword')}
+                    style={{
+                      position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)',
+                      background: 'none', border: 'none', cursor: 'pointer',
+                      color: 'var(--text-muted)', display: 'flex', alignItems: 'center', padding: 0
+                    }}
+                    aria-label={showPass.newPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showPass.newPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
               </div>
               <div>
                 <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>Confirm Password</label>
-                <input
-                  className="input-field"
-                  name="confirmPassword"
-                  type="password"
-                  placeholder="Repeat new password"
-                  value={form.confirmPassword}
-                  onChange={handle}
-                  required
-                />
+                <div style={{ position: 'relative' }}>
+                  <input
+                    className="input-field"
+                    name="confirmPassword"
+                    type={showPass.confirmPassword ? 'text' : 'password'}
+                    placeholder="Repeat new password"
+                    value={form.confirmPassword}
+                    onChange={handle}
+                    required
+                    style={{ paddingRight: '44px' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => togglePass('confirmPassword')}
+                    style={{
+                      position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)',
+                      background: 'none', border: 'none', cursor: 'pointer',
+                      color: 'var(--text-muted)', display: 'flex', alignItems: 'center', padding: 0
+                    }}
+                    aria-label={showPass.confirmPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showPass.confirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
               </div>
             </>
           )}
 
           {error && (
-            <div style={{ background: 'rgba(224,85,85,0.1)', border: '1px solid rgba(224,85,85,0.3)', borderRadius: 'var(--radius-sm)', padding: '10px 14px', color: 'var(--error)', fontSize: '0.875rem' }}>
-              {error}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div style={{ background: 'rgba(224,85,85,0.1)', border: '1px solid rgba(224,85,85,0.3)', borderRadius: 'var(--radius-sm)', padding: '10px 14px', color: 'var(--error)', fontSize: '0.875rem', lineHeight: 1.4 }}>
+                {error}
+              </div>
+              {(error.toLowerCase().includes('rate limit') || error.toLowerCase().includes('rate_limit') || error.toLowerCase().includes('exceeded')) && (
+                <div style={{ background: 'rgba(var(--accent-rgb),0.06)', border: '1px dashed var(--accent-gold)', borderRadius: 'var(--radius-sm)', padding: '10px 14px', fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.4 }}>
+                  💡 <strong>Developer Tip:</strong> You can disable email confirmations or adjust rate limits in your <strong>Supabase Dashboard</strong> under <em>Authentication → Providers → Email</em> to bypass this limitation completely.
+                </div>
+              )}
             </div>
           )}
 

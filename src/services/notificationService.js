@@ -46,6 +46,47 @@ async function sendToSw(message) {
   return true;
 }
 
+/** Send a CHECK_REMINDER heartbeat — called every ~30s by the app to keep SW alive. */
+export async function sendReminderHeartbeat() {
+  return sendToSw({ type: 'CHECK_REMINDER' });
+}
+
+/**
+ * App-side time check — reads reminder config from localStorage and fires
+ * a direct Notification if the SW is unavailable and it's time.
+ * Called by the setInterval in useReminder.
+ */
+export function appSideReminderCheck() {
+  try {
+    const raw = localStorage.getItem('sw_reminder_config');
+    if (!raw) return;
+    const config = JSON.parse(raw);
+    if (!config || !config.on) return;
+    const now = new Date();
+    const h = now.getHours();
+    const m = now.getMinutes();
+    const todayStr = now.toDateString();
+    if (config.lastFiredDate === todayStr) return;
+    if (h === config.hour && m === config.minute) {
+      // Mark fired so we don't double-fire
+      config.lastFiredDate = todayStr;
+      localStorage.setItem('sw_reminder_config', JSON.stringify(config));
+      // Try SW first, fallback to direct Notification API
+      sendToSw({ type: 'CHECK_REMINDER' }).catch(() => {});
+      // Direct fallback
+      if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+        try {
+          new Notification('📖 Sacred Word', {
+            body: `Time to spend a few minutes with God's Word, ${config.userName || 'Beloved'}. Tap to continue reading. 🙏`,
+            icon: '/logo.jpg',
+            tag: 'daily-reminder'
+          });
+        } catch (e) { /* ignore */ }
+      }
+    }
+  } catch (e) { /* ignore parse errors */ }
+}
+
 // ─── Notification Service ─────────────────────────────────────────────────────
 export const notificationService = {
 
@@ -141,6 +182,19 @@ export const notificationService = {
         userName
       });
 
+      // Also persist config in localStorage so app-side check loop works
+      // even if the SW was killed and hasn't re-hydrated yet.
+      try {
+        const existing = JSON.parse(localStorage.getItem('sw_reminder_config') || '{}')
+        localStorage.setItem('sw_reminder_config', JSON.stringify({
+          on: true,
+          hour: parseInt(hour, 10),
+          minute: parseInt(minute, 10),
+          userName,
+          lastFiredDate: existing.lastFiredDate || null
+        }));
+      } catch(e) {}
+
       if (ok) {
         console.log(`[NotificationService] Web reminder scheduled at ${hour}:${String(minute).padStart(2, '0')} via SW`);
       }
@@ -166,6 +220,15 @@ export const notificationService = {
       }
     } else {
       await sendToSw({ type: 'CANCEL_REMINDER' });
+      // Clear app-side config too
+      try {
+        const raw = localStorage.getItem('sw_reminder_config');
+        if (raw) {
+          const cfg = JSON.parse(raw);
+          cfg.on = false;
+          localStorage.setItem('sw_reminder_config', JSON.stringify(cfg));
+        }
+      } catch(e) {}
     }
   },
 

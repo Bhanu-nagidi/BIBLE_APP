@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { useBible, BIBLE_BOOKS } from '../contexts/BibleContext'
 import { useBibleAPI } from '../hooks/useBibleAPI'
 
-//*const POPULAR_SEARCHES = ['love', 'faith', 'hope', 'peace', 'strength', 'grace', 'forgiveness', 'salvation']*//
+const POPULAR_SEARCHES = ['love', 'faith', 'hope', 'peace', 'strength', 'grace', 'forgiveness', 'salvation', 'prayer', 'wisdom', 'joy', 'light']
 
 const BOOK_ABBREVIATIONS = {
   gen: 'GEN', genesis: 'GEN',

@@ -603,43 +603,40 @@ export default function HomeScreen() {
         {/* Quick Access */}
         <div style={{ marginBottom: '20px' }}>
           <h3 style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '12px' }}>Quick Access</h3>
-          <div className="quick-access-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
             {[
-              { icon: '📖', label: 'Read Bible', desc: 'Continue reading', action: () => navigate('/bible') },
-              { icon: '🔍', label: 'Search', desc: 'Find verses', action: () => navigate('/search') },
-              { icon: '🔖', label: 'Bookmarks', desc: 'Saved verses', action: () => navigate('/bookmarks') },
-              { icon: '🎵', label: 'Audio Bible', desc: 'Listen now', action: () => navigate('/bible?audio=1') },
+              { icon: '📖', label: 'Read Bible',  desc: 'Continue reading', action: () => navigate('/bible') },
+              { icon: '🔍', label: 'Search',      desc: 'Find verses',      action: () => navigate('/search') },
+              { icon: '🔖', label: 'Bookmarks',   desc: 'Saved verses',     action: () => navigate('/bookmarks') },
+              { icon: '🎵', label: 'Audio Bible', desc: 'Listen now',       action: () => navigate('/bible?audio=1') },
             ].map(item => (
               <button
                 key={item.label}
                 onClick={item.action}
-                className="card quick-access-card"
+                className="card"
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '16px',
+                  gap: '12px',
                   textAlign: 'left',
                   cursor: 'pointer',
                   transition: 'all 0.2s',
                   border: '1px solid var(--border-subtle)',
-                  padding: '16px 20px',
+                  borderRadius: '16px',
+                  padding: '14px 16px',
                   width: '100%',
+                  background: 'var(--bg-card)',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
                 }}
                 onMouseEnter={e => e.currentTarget.style.borderColor = 'rgba(var(--accent-rgb),0.3)'}
                 onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border-subtle)'}
               >
-                <div style={{
-                  fontSize: '1.8rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0
-                }}>
+                <span style={{ fontSize: '1.6rem', flexShrink: 0, lineHeight: 1 }}>
                   {item.icon}
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
-                  <div style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--text-primary)' }}>{item.label}</div>
-                  <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.desc}</div>
+                </span>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', minWidth: 0 }}>
+                  <div style={{ fontWeight: 600, fontSize: '0.88rem', color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>{item.label}</div>
+                  <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.desc}</div>
                 </div>
               </button>
             ))}
