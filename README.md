@@ -8,7 +8,7 @@ A complete, beautiful Bible web application with multilingual support, audio, bo
 - **Home Screen** — Verse of the Day, streak tracker, quick navigation
 - **Bible Reader** — All 66 books, chapter navigation, bookmark verses, copy & share
 - **Audio Bible** — Built-in audio player for ESV (expandable to other versions)
-- **Multilingual** — 10+ languages (English, Telugu, Hindi, Tamil, Spanish, Portuguese, French, German, Chinese, Korean)
+- **Multilingual** — 10+ languages (English, Telugu, Hindi, Tamil, Malayalam , ordu, Bengali)
 - **Search** — Search across all Scripture with topic suggestions
 - **Bookmarks** — Save and organize your favorite verses
 - **Daily Streak** — Track your daily reading habit with a 7-day history view
@@ -76,13 +76,6 @@ bible-app/
 ├── package.json
 └── vite.config.js
 ```
-
-## Bible API
-
-This app uses the **scripture.api.bible** API (free tier available):
-- 2,500+ Bible versions in 1,600+ languages
-- REST API with JSON response
-- Free registration at https://scripture.api.bible
 
 The app runs in **demo mode** without an API key, showing sample content so you can preview the UI.
 

@@ -31,7 +31,7 @@ export function useReminder(user, isGuest, showToast) {
     if (savedOn) {
       const userName = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Beloved';
       const [h, m]   = savedTime.split(':');
-      notificationService.scheduleDailyReminder(h, m, userName).catch(console.warn);
+      notificationService.scheduleDailyReminder(h, m, userName, user.id).catch(console.warn);
     }
   }, [user?.id, isGuest]);
 
@@ -80,7 +80,7 @@ export function useReminder(user, isGuest, showToast) {
 
       const userName = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Beloved';
       const [h, m]   = reminderTime.split(':');
-      const scheduled = await notificationService.scheduleDailyReminder(h, m, userName);
+      const scheduled = await notificationService.scheduleDailyReminder(h, m, userName, user.id);
 
       if (scheduled) {
         showToast('⏰ Daily reminder enabled!');
@@ -95,7 +95,7 @@ export function useReminder(user, isGuest, showToast) {
 
       syncService.updateDebounced(user.id, 'reminders', { on: false, time: reminderTime });
 
-      await notificationService.cancelDailyReminder();
+      await notificationService.cancelDailyReminder(user.id);
       showToast('Reminder turned off.');
     }
   }, [reminderOn, reminderTime, user?.id, user?.user_metadata?.name, user?.email, isGuest, showToast]);
@@ -113,7 +113,7 @@ export function useReminder(user, isGuest, showToast) {
     if (reminderOn && !isGuest) {
       const userName = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Beloved';
       const [h, m]   = newTimeStr.split(':');
-      await notificationService.scheduleDailyReminder(h, m, userName);
+      await notificationService.scheduleDailyReminder(h, m, userName, user.id);
       showToast(`⏰ Reminder rescheduled!`);
     }
   }, [reminderOn, user?.id, user?.user_metadata?.name, user?.email, isGuest, showToast]);

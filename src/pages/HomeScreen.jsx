@@ -27,13 +27,17 @@ export default function HomeScreen() {
     }
   }
 
-  const handleReadVotd = (verseRef) => {
-    if (!verseRef) return
+  // Book names in daily-verse references don't always match BIBLE_BOOKS exactly
+  // (e.g. the conventional "Psalm 23:1" vs. the book list's "Psalms").
+  const BOOK_NAME_ALIASES = { psalm: 'psalms' }
+
+  const parseVerseReference = (verseRef) => {
+    if (!verseRef) return null
 
     // Try to parse reference e.g., "John 3:16" or "1 John 3"
     const clean = verseRef.trim().replace(/\s+/g, ' ')
     const match = clean.match(/^(.+?)\s+(\d+)(?:\s*:\s*(\d+))?$/)
-    
+
     let resolvedBook = null
     let chapterNum = 1
     let verseNum = null
@@ -42,26 +46,30 @@ export default function HomeScreen() {
       const bookPart = match[1].trim().toLowerCase()
       chapterNum = parseInt(match[2], 10)
       verseNum = match[3] ? parseInt(match[3], 10) : null
-      
-      resolvedBook = BIBLE_BOOKS.find(b => 
-        b.name.toLowerCase() === bookPart || 
+
+      const aliasedBookPart = BOOK_NAME_ALIASES[bookPart] || bookPart
+      resolvedBook = BIBLE_BOOKS.find(b =>
+        b.name.toLowerCase() === aliasedBookPart ||
         b.id.toLowerCase() === bookPart
       )
     } else {
       // Just book name
-      resolvedBook = BIBLE_BOOKS.find(b => b.name.toLowerCase() === clean.toLowerCase())
+      const bookPart = clean.toLowerCase()
+      const aliasedBookPart = BOOK_NAME_ALIASES[bookPart] || bookPart
+      resolvedBook = BIBLE_BOOKS.find(b => b.name.toLowerCase() === aliasedBookPart)
     }
 
-    if (resolvedBook) {
-      setCurrentBook(resolvedBook)
-      setCurrentChapter(chapterNum)
-      if (verseNum) {
-        setSelectedVerse(String(verseNum))
-      } else {
-        setSelectedVerse(null)
-      }
-      navigate('/bible')
-    }
+    return resolvedBook ? { book: resolvedBook, chapter: chapterNum, verse: verseNum } : null
+  }
+
+  const handleReadVotd = (verseRef) => {
+    const parsed = parseVerseReference(verseRef)
+    if (!parsed) return
+
+    setCurrentBook(parsed.book)
+    setCurrentChapter(parsed.chapter)
+    setSelectedVerse(parsed.verse ? String(parsed.verse) : null)
+    navigate('/bible')
   }
 
   // Calculate completed percent
@@ -571,7 +579,17 @@ export default function HomeScreen() {
               <div style={{ display: 'flex', gap: '8px' }}>
                 <button
                   className={`bookmark-btn ${isBookmarked(votd.reference) ? 'saved' : ''}`}
-                  onClick={() => addBookmark({ id: votd.reference, reference: votd.reference, text: votd.text })}
+                  onClick={() => {
+                    const parsed = parseVerseReference(votd.reference)
+                    addBookmark({
+                      id: votd.reference,
+                      reference: votd.reference,
+                      text: votd.text,
+                      book: parsed?.book.name,
+                      chapter: parsed?.chapter,
+                      verse: parsed?.verse
+                    })
+                  }}
                   style={{
                     display: 'flex',
                     alignItems: 'center',

@@ -12,13 +12,33 @@ export default function BookmarksScreen() {
     .filter(b => b.reference?.toLowerCase().includes(search.toLowerCase()) || b.text?.toLowerCase().includes(search.toLowerCase()))
     .sort((a, b) => sortBy === 'newest' ? new Date(b.savedAt) - new Date(a.savedAt) : new Date(a.savedAt) - new Date(b.savedAt))
 
-  const goToVerse = (bookmark) => {
+  // Older bookmarks (saved before book/chapter were captured at save time) only
+  // have a "Book Chapter:Verse" reference string — fall back to parsing that.
+  const BOOK_NAME_ALIASES = { psalm: 'psalms' }
+
+  const resolveBookmarkTarget = (bookmark) => {
     if (bookmark.book) {
       const book = BIBLE_BOOKS.find(b => b.name === bookmark.book)
-      if (book) {
-        setCurrentBook(book)
-        setCurrentChapter(bookmark.chapter || 1)
-      }
+      if (book) return { book, chapter: bookmark.chapter || 1 }
+    }
+
+    const clean = (bookmark.reference || '').trim().replace(/\s+/g, ' ')
+    const match = clean.match(/^(.+?)\s+(\d+)(?:\s*:\s*(\d+))?$/)
+    if (!match) return null
+
+    const bookPart = match[1].trim().toLowerCase()
+    const aliasedBookPart = BOOK_NAME_ALIASES[bookPart] || bookPart
+    const book = BIBLE_BOOKS.find(b => b.name.toLowerCase() === aliasedBookPart)
+    if (!book) return null
+
+    return { book, chapter: parseInt(match[2], 10) }
+  }
+
+  const goToVerse = (bookmark) => {
+    const target = resolveBookmarkTarget(bookmark)
+    if (target) {
+      setCurrentBook(target.book)
+      setCurrentChapter(target.chapter)
     }
     navigate('/bible')
   }

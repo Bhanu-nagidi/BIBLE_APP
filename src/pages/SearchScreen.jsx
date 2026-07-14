@@ -410,7 +410,18 @@ export default function SearchScreen() {
                       <span style={{ color: 'var(--accent-gold)', fontWeight: 600, fontSize: '0.875rem' }}>{verse.reference}</span>
                       <button
                         className={`bookmark-btn ${isBookmarked(verse.id) ? 'saved' : ''}`}
-                        onClick={(e) => { e.stopPropagation(); addBookmark({ id: verse.id, reference: verse.reference, text: verse.text }) }}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          const book = BIBLE_BOOKS.find(b => b.id === verse.bookId)
+                          addBookmark({
+                            id: verse.id,
+                            reference: verse.reference,
+                            text: verse.text,
+                            book: book?.name,
+                            chapter: verse.chapter,
+                            verse: verse.verseNumber
+                          })
+                        }}
                       >
                         {isBookmarked(verse.id) ? '🔖' : '🕮'}
                       </button>

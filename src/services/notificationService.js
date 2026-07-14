@@ -1,4 +1,5 @@
 import { LocalNotifications } from '@capacitor/local-notifications';
+import { pushSubscriptionService } from './pushSubscriptionService';
 
 // ─── Native vs Web detection ──────────────────────────────────────────────────
 // Do NOT cache as a top-level const — the Capacitor bridge may attach to `window`
@@ -124,11 +125,13 @@ export const notificationService = {
 
   /**
    * Schedule a daily local notification at hour:minute.
-   * - Native: uses @capacitor/local-notifications
-   * - Web: sends a SCHEDULE_REMINDER message to the Service Worker, which
-   *   sets a setTimeout internally so it fires even when the app tab is closed.
+   * - Native: uses @capacitor/local-notifications (OS-level AlarmManager — fires
+   *   even with the app fully closed).
+   * - Web: subscribes to Web Push (server-sent, fires even with the app/tab fully
+   *   closed) and also nudges the Service Worker's best-effort in-app timer as a
+   *   belt-and-suspenders fallback while the app happens to be open.
    */
-  async scheduleDailyReminder(hour, minute, userName = 'Beloved') {
+  async scheduleDailyReminder(hour, minute, userName = 'Beloved', userId = null) {
     const notificationId = 1001;
 
     if (isNative()) {
@@ -198,14 +201,21 @@ export const notificationService = {
       if (ok) {
         console.log(`[NotificationService] Web reminder scheduled at ${hour}:${String(minute).padStart(2, '0')} via SW`);
       }
-      return ok;
+
+      // Real background delivery — works even when the app/tab is fully closed.
+      const pushOk = await pushSubscriptionService.subscribe(userId, hour, minute, userName);
+      if (!pushOk) {
+        console.warn('[NotificationService] Web Push subscription failed — reminder will only fire while the app is open.');
+      }
+
+      return ok || pushOk;
     }
   },
 
   /**
    * Cancel the daily reminder notification.
    */
-  async cancelDailyReminder() {
+  async cancelDailyReminder(userId = null) {
     const notificationId = 1001;
     if (isNative()) {
       try {
@@ -229,6 +239,7 @@ export const notificationService = {
           localStorage.setItem('sw_reminder_config', JSON.stringify(cfg));
         }
       } catch(e) {}
+      await pushSubscriptionService.unsubscribe(userId);
     }
   },
 
